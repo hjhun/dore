@@ -7,7 +7,7 @@ use clap::{Args, Parser, Subcommand};
 
 use crate::core::clock::{Clock, SystemClock};
 use crate::core::error::{DoreError, DoreResult};
-use crate::core::ids::{IdFactory, SequentialIdFactory};
+use crate::core::ids::{FsJobIdAllocator, IdFactory, JobIdAllocator, SequentialIdFactory};
 use crate::graphify::availability::{
     GraphifyAvailabilityChecker, GraphifyStatusReport, SystemCommandProbe,
 };
@@ -136,11 +136,7 @@ where
     dispatch(cli, stdout, stderr)
 }
 
-fn dispatch<W: Write, E: Write>(
-    cli: DoreCli,
-    stdout: &mut W,
-    stderr: &mut E,
-) -> DoreResult<()> {
+fn dispatch<W: Write, E: Write>(cli: DoreCli, stdout: &mut W, stderr: &mut E) -> DoreResult<()> {
     match cli.command {
         TopCommand::Init(args) => run_init(args, stdout),
         TopCommand::Ingest(args) => run_ingest(args, stdout, stderr),
@@ -223,6 +219,7 @@ fn run_ingest<W: Write, E: Write>(
 
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let ids: Arc<dyn IdFactory> = Arc::new(SequentialIdFactory::new());
+    let job_ids: Arc<dyn JobIdAllocator> = Arc::new(FsJobIdAllocator::new(layout.clone()));
     let defaults = PolicyDefaults::embedded()?;
     let policy = Arc::new(PolicyEngine::new(defaults, clock.clone(), ids.clone()));
     let normalizer = EvidenceNormalizer::new(clock.clone(), ids.clone());
@@ -234,7 +231,7 @@ fn run_ingest<W: Write, E: Write>(
         raw_repo,
         job_log,
         clock.clone(),
-        ids.clone(),
+        job_ids,
     );
 
     let request = IngestRequest {
@@ -265,17 +262,11 @@ fn run_wiki_generate<W: Write>(args: WikiGenerateArgs, stdout: &mut W) -> DoreRe
     ensure_initialized(&layout)?;
 
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
-    let ids: Arc<dyn IdFactory> = Arc::new(SequentialIdFactory::new());
+    let job_ids: Arc<dyn JobIdAllocator> = Arc::new(FsJobIdAllocator::new(layout.clone()));
     let raw_repo = Arc::new(RawEvidenceRepository::new(layout.clone()));
     let wiki_repo = Arc::new(WikiRepository::new(layout.clone()));
     let job_log = Arc::new(JobLogRepository::new(layout.clone()));
-    let service = WikiGenerationService::new(
-        raw_repo,
-        wiki_repo,
-        job_log,
-        clock,
-        ids,
-    );
+    let service = WikiGenerationService::new(raw_repo, wiki_repo, job_log, clock, job_ids);
     let result = service.generate(WikiGenerateRequest)?;
     writeln!(
         stdout,
@@ -293,24 +284,18 @@ fn run_graphify_check<W: Write>(args: GraphifyCheckArgs, stdout: &mut W) -> Dore
     ensure_initialized(&layout)?;
 
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
-    let ids: Arc<dyn IdFactory> = Arc::new(SequentialIdFactory::new());
+    let job_ids: Arc<dyn JobIdAllocator> = Arc::new(FsJobIdAllocator::new(layout.clone()));
     let probe = Arc::new(SystemCommandProbe::new());
     let checker = GraphifyAvailabilityChecker::new(probe);
 
     let started_at = clock.now();
-    let job_id = ids.job_id(started_at, "graphify_check");
+    let job_id = job_ids.allocate(started_at, "graphify_check")?;
 
     let report = checker.check()?;
     let finished_at = clock.now();
 
     let status = format!("{:?}", report.status).to_lowercase();
-    writeln!(
-        stdout,
-        "Graphify status: {} ({})",
-        status,
-        report.message
-    )
-    .ok();
+    writeln!(stdout, "Graphify status: {} ({})", status, report.message).ok();
 
     // Persist a status snapshot under memory/graph/status/<job>.json.
     let status_dir = layout.graph_status_dir();
@@ -363,12 +348,12 @@ struct GraphifyStatusReportEnvelope {
 fn read_payload(file: Option<&PathBuf>, use_stdin: bool) -> DoreResult<Vec<u8>> {
     if use_stdin {
         let mut buf = Vec::new();
-        std::io::stdin().read_to_end(&mut buf).map_err(|source| {
-            DoreError::Io {
+        std::io::stdin()
+            .read_to_end(&mut buf)
+            .map_err(|source| DoreError::Io {
                 path: PathBuf::from("<stdin>"),
                 source,
-            }
-        })?;
+            })?;
         return Ok(buf);
     }
     if let Some(path) = file {

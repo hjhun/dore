@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::core::clock::Clock;
 use crate::core::error::{DoreError, DoreResult};
-use crate::core::ids::IdFactory;
+use crate::core::ids::JobIdAllocator;
 use crate::ingest::normalizer::EvidenceNormalizer;
 use crate::jobs::reporter::{JobReport, JobStatus};
 use crate::policy::engine::PolicyEngine;
@@ -69,7 +69,7 @@ pub struct IngestionService {
     raw_repo: Arc<dyn RawEvidenceRepositoryPort>,
     job_log: Arc<dyn JobLogRepositoryPort>,
     clock: Arc<dyn Clock>,
-    ids: Arc<dyn IdFactory>,
+    job_ids: Arc<dyn JobIdAllocator>,
 }
 
 impl IngestionService {
@@ -79,7 +79,7 @@ impl IngestionService {
         raw_repo: Arc<dyn RawEvidenceRepositoryPort>,
         job_log: Arc<dyn JobLogRepositoryPort>,
         clock: Arc<dyn Clock>,
-        ids: Arc<dyn IdFactory>,
+        job_ids: Arc<dyn JobIdAllocator>,
     ) -> Self {
         Self {
             policy,
@@ -87,13 +87,13 @@ impl IngestionService {
             raw_repo,
             job_log,
             clock,
-            ids,
+            job_ids,
         }
     }
 
     pub fn ingest(&self, request: IngestRequest) -> DoreResult<IngestResult> {
         let started_at = self.clock.now();
-        let job_id = self.ids.job_id(started_at, "ingest");
+        let job_id = self.job_ids.allocate(started_at, "ingest")?;
 
         let policy_request = PolicyRequest {
             action: crate::policy::model::PolicyAction::IngestRawEvidence,
@@ -110,9 +110,10 @@ impl IngestionService {
             Err(err) => {
                 let finished_at = self.clock.now();
                 let (decision_id, reason) = match &err {
-                    DoreError::PolicyDenied { decision_id, reason } => {
-                        (decision_id.clone(), reason.clone())
-                    }
+                    DoreError::PolicyDenied {
+                        decision_id,
+                        reason,
+                    } => (decision_id.clone(), reason.clone()),
                     other => (String::from("unknown"), other.to_string()),
                 };
                 let blocked = JobReport::new(

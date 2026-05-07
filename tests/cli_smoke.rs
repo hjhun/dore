@@ -1,7 +1,46 @@
 use std::ffi::OsString;
 use std::path::Path;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use dore::cli::run_with_args;
+
+// Cargo runs tests in parallel threads inside a single process, so any test
+// that mutates `GRAPHIFY_CMD` must serialize against every other test that
+// reads or writes the same variable. This guard takes a process-wide lock,
+// captures the previous value, and restores it on drop, so the env state
+// is observable only to the test that holds the guard.
+static GRAPHIFY_ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+struct GraphifyEnvGuard {
+    _guard: MutexGuard<'static, ()>,
+    previous: Option<String>,
+}
+
+impl GraphifyEnvGuard {
+    fn set(value: &str) -> Self {
+        let lock = GRAPHIFY_ENV_LOCK.get_or_init(|| Mutex::new(()));
+        let guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous = std::env::var(dore::graphify::availability::ENV_GRAPHIFY_CMD).ok();
+        std::env::set_var(dore::graphify::availability::ENV_GRAPHIFY_CMD, value);
+        Self {
+            _guard: guard,
+            previous,
+        }
+    }
+}
+
+impl Drop for GraphifyEnvGuard {
+    fn drop(&mut self) {
+        match &self.previous {
+            Some(value) => {
+                std::env::set_var(dore::graphify::availability::ENV_GRAPHIFY_CMD, value);
+            }
+            None => {
+                std::env::remove_var(dore::graphify::availability::ENV_GRAPHIFY_CMD);
+            }
+        }
+    }
+}
 
 fn dore_args(args: &[&str]) -> Vec<OsString> {
     let mut v = Vec::with_capacity(args.len() + 1);
@@ -142,6 +181,129 @@ fn fast_consecutive_ingests_produce_distinct_evidence_ids() {
     // Ingest job log preserved every entry append-only.
     let log = std::fs::read_to_string(root.join("memory/jobs/ingest.jsonl")).unwrap();
     assert_eq!(log.lines().count(), 5);
+
+    // Each rapid invocation must mint a distinct job_id so the JSONL audit
+    // trail is unambiguous. Without on-disk reservation each fresh process
+    // would hand out the same `_0001` suffix in the same wall-clock second.
+    let mut job_ids: Vec<String> = log
+        .lines()
+        .map(|line| {
+            let value: serde_json::Value = serde_json::from_str(line).unwrap();
+            value["job_id"].as_str().unwrap().to_string()
+        })
+        .collect();
+    job_ids.sort();
+    job_ids.dedup();
+    assert_eq!(
+        job_ids.len(),
+        5,
+        "expected 5 distinct ingest job_ids, got: {job_ids:?}"
+    );
+
+    // The on-disk reservation directory must contain a marker per minted id.
+    let reserved_dir = root.join("memory/jobs/_reserved");
+    let reservation_count = std::fs::read_dir(&reserved_dir).unwrap().count();
+    assert!(
+        reservation_count >= 5,
+        "expected at least 5 reservations under {}, got {}",
+        reserved_dir.display(),
+        reservation_count
+    );
+}
+
+#[test]
+fn fast_consecutive_graphify_checks_produce_distinct_job_ids_and_status_files() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let root = tmp.path().join("runtime");
+    let root_str = root.display().to_string();
+
+    let _env = GraphifyEnvGuard::set("definitely-not-installed-graphify-xyz");
+
+    // Run several availability checks back-to-back. Each in-process call mints
+    // a fresh allocator just like a fresh CLI process. Without on-disk
+    // reservation the second status snapshot would overwrite the first.
+    for _ in 0..3 {
+        let (_stdout, _stderr, result) =
+            run_cli(&["graphify", "check", "--runtime-root", &root_str]);
+        result.unwrap();
+    }
+
+    let log = std::fs::read_to_string(root.join("memory/jobs/graphify_check.jsonl")).unwrap();
+    let lines: Vec<&str> = log.lines().collect();
+    assert_eq!(lines.len(), 3, "expected 3 graphify_check entries");
+
+    let mut job_ids: Vec<String> = lines
+        .iter()
+        .map(|line| {
+            let value: serde_json::Value = serde_json::from_str(line).unwrap();
+            value["job_id"].as_str().unwrap().to_string()
+        })
+        .collect();
+    job_ids.sort();
+    job_ids.dedup();
+    assert_eq!(
+        job_ids.len(),
+        3,
+        "expected 3 distinct graphify job_ids, got: {job_ids:?}"
+    );
+
+    // Each job's status snapshot must survive: rapid checks must not clobber
+    // earlier evidence by sharing a filename with a later run.
+    let status_dir = root.join("memory/graph/status");
+    let status_files: Vec<_> = std::fs::read_dir(&status_dir).unwrap().collect();
+    assert_eq!(
+        status_files.len(),
+        3,
+        "expected one status snapshot per check"
+    );
+}
+
+#[test]
+fn fast_consecutive_wiki_generates_produce_distinct_job_ids() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let root = tmp.path().join("runtime");
+    let root_str = root.display().to_string();
+    run_cli(&["init", "--runtime-root", &root_str]).2.unwrap();
+
+    let payload = write_payload(tmp.path(), "note.md", "# wiki\n\nbody.\n");
+    let payload_str = payload.display().to_string();
+    run_cli(&[
+        "ingest",
+        "--kind",
+        "note",
+        "--title",
+        "wiki seed",
+        "--file",
+        &payload_str,
+        "--runtime-root",
+        &root_str,
+    ])
+    .2
+    .unwrap();
+
+    for _ in 0..3 {
+        run_cli(&["wiki", "generate", "--runtime-root", &root_str])
+            .2
+            .unwrap();
+    }
+
+    let log = std::fs::read_to_string(root.join("memory/jobs/wiki_generate.jsonl")).unwrap();
+    let lines: Vec<&str> = log.lines().collect();
+    assert_eq!(lines.len(), 3);
+    let mut job_ids: Vec<String> = lines
+        .iter()
+        .map(|line| {
+            let value: serde_json::Value = serde_json::from_str(line).unwrap();
+            value["job_id"].as_str().unwrap().to_string()
+        })
+        .collect();
+    job_ids.sort();
+    job_ids.dedup();
+    assert_eq!(
+        job_ids.len(),
+        3,
+        "expected 3 distinct wiki_generate job_ids, got: {job_ids:?}"
+    );
 }
 
 #[test]
@@ -182,8 +344,7 @@ fn ingest_note_then_generate_wiki_records_provenance() {
     assert_eq!(metadata_entries.len(), 1);
 
     // Generate wiki.
-    let (wiki_stdout, _, wiki_result) =
-        run_cli(&["wiki", "generate", "--runtime-root", &root_str]);
+    let (wiki_stdout, _, wiki_result) = run_cli(&["wiki", "generate", "--runtime-root", &root_str]);
     wiki_result.unwrap();
     assert!(wiki_stdout.contains("Wiki generated"));
 
@@ -198,7 +359,9 @@ fn ingest_note_then_generate_wiki_records_provenance() {
     assert!(log_md.contains("Provenance: manual_cli"));
 
     // Run wiki generate a second time to confirm append-only log behavior.
-    run_cli(&["wiki", "generate", "--runtime-root", &root_str]).2.unwrap();
+    run_cli(&["wiki", "generate", "--runtime-root", &root_str])
+        .2
+        .unwrap();
     let log_md_after = std::fs::read_to_string(root.join("memory/wiki/log.md")).unwrap();
     assert!(
         log_md_after.len() > log_md.len(),
@@ -238,10 +401,17 @@ fn ingest_note_then_generate_wiki_records_provenance() {
             "evidence metadata missing log.md output: {collected:?}",
         );
         // Re-run should not double-list outputs.
-        assert_eq!(collected.len(), 2, "outputs should dedupe across runs: {collected:?}");
+        assert_eq!(
+            collected.len(),
+            2,
+            "outputs should dedupe across runs: {collected:?}"
+        );
         found_outputs = true;
     }
-    assert!(found_outputs, "expected at least one evidence metadata file");
+    assert!(
+        found_outputs,
+        "expected at least one evidence metadata file"
+    );
 }
 
 #[test]
@@ -275,7 +445,10 @@ fn ingest_conversation_summary_is_classified_correctly() {
             break;
         }
     }
-    assert!(found_payload, "expected a .md payload under memory/raw/conversations");
+    assert!(
+        found_payload,
+        "expected a .md payload under memory/raw/conversations"
+    );
 
     let index_dir = root.join("memory/raw/index");
     let metadata_path = std::fs::read_dir(&index_dir)
@@ -345,20 +518,9 @@ fn graphify_check_succeeds_when_unavailable_and_records_status() {
     let root_str = root.display().to_string();
 
     // Force GRAPHIFY_CMD to a guaranteed-missing binary so the test is hermetic.
-    let prev = std::env::var(dore::graphify::availability::ENV_GRAPHIFY_CMD).ok();
-    std::env::set_var(
-        dore::graphify::availability::ENV_GRAPHIFY_CMD,
-        "definitely-not-installed-graphify-xyz",
-    );
+    let _env = GraphifyEnvGuard::set("definitely-not-installed-graphify-xyz");
 
-    let (stdout, _, result) =
-        run_cli(&["graphify", "check", "--runtime-root", &root_str]);
-
-    if let Some(value) = prev {
-        std::env::set_var(dore::graphify::availability::ENV_GRAPHIFY_CMD, value);
-    } else {
-        std::env::remove_var(dore::graphify::availability::ENV_GRAPHIFY_CMD);
-    }
+    let (stdout, _, result) = run_cli(&["graphify", "check", "--runtime-root", &root_str]);
 
     result.unwrap();
     assert!(

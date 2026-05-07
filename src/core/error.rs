@@ -14,16 +14,10 @@ pub enum DoreError {
     InvalidRuntimeRoot { path: PathBuf, reason: String },
 
     #[error("policy denied (decision {decision_id}): {reason}")]
-    PolicyDenied {
-        decision_id: String,
-        reason: String,
-    },
+    PolicyDenied { decision_id: String, reason: String },
 
     #[error("approval required (decision {decision_id}) for action {action}")]
-    ApprovalRequired {
-        decision_id: String,
-        action: String,
-    },
+    ApprovalRequired { decision_id: String, action: String },
 
     #[error("unsupported source kind: {source_kind}")]
     UnsupportedSourceKind { source_kind: String },

@@ -128,8 +128,7 @@ impl RawEvidenceRepositoryPort for RawEvidenceRepository {
                 resolve_available_evidence_id(&metadata.evidence_id, &metadata_dir)?;
             let candidate_metadata_path =
                 metadata_dir.join(format!("{}.json", metadata.evidence_id));
-            let candidate_payload_path =
-                payload_dir.join(format!("{}.md", metadata.evidence_id));
+            let candidate_payload_path = payload_dir.join(format!("{}.md", metadata.evidence_id));
 
             // Reflect the resolved storage path before serializing.
             let stored_relative =
@@ -138,12 +137,11 @@ impl RawEvidenceRepositoryPort for RawEvidenceRepository {
             metadata.payload.content_type = payload.content_type.clone();
             metadata.payload.bytes = payload.bytes.len() as u64;
 
-            metadata_bytes = serde_json::to_vec_pretty(&metadata).map_err(|err| {
-                DoreError::Serialization {
+            metadata_bytes =
+                serde_json::to_vec_pretty(&metadata).map_err(|err| DoreError::Serialization {
                     format: "json".into(),
                     message: err.to_string(),
-                }
-            })?;
+                })?;
 
             match write_new_file(&candidate_metadata_path, &metadata_bytes) {
                 Ok(()) => {
@@ -151,9 +149,7 @@ impl RawEvidenceRepositoryPort for RawEvidenceRepository {
                     payload_path = candidate_payload_path;
                     break;
                 }
-                Err(DoreError::Io { source, .. })
-                    if source.kind() == ErrorKind::AlreadyExists =>
-                {
+                Err(DoreError::Io { source, .. }) if source.kind() == ErrorKind::AlreadyExists => {
                     attempts += 1;
                     if attempts > MAX_EVIDENCE_ID_RETRIES {
                         return Err(DoreError::AppendOnlyViolation {
@@ -203,12 +199,11 @@ impl RawEvidenceRepositoryPort for RawEvidenceRepository {
                 path: path.clone(),
                 source,
             })?;
-            let metadata: RawEvidenceMetadata = serde_json::from_slice(&bytes).map_err(|err| {
-                DoreError::Serialization {
+            let metadata: RawEvidenceMetadata =
+                serde_json::from_slice(&bytes).map_err(|err| DoreError::Serialization {
                     format: "json".into(),
                     message: format!("{}: {}", path.display(), err),
-                }
-            })?;
+                })?;
             entries.push(metadata);
         }
         entries.sort_by(|a, b| a.captured_at.cmp(&b.captured_at));
@@ -220,9 +215,7 @@ impl RawEvidenceRepositoryPort for RawEvidenceRepository {
         evidence_id: &str,
         outputs: &[String],
     ) -> DoreResult<RawEvidenceMetadata> {
-        let metadata_path = self
-            .metadata_dir()
-            .join(format!("{evidence_id}.json"));
+        let metadata_path = self.metadata_dir().join(format!("{evidence_id}.json"));
         if !metadata_path.exists() {
             return Err(DoreError::InvalidInput {
                 field: "evidence_id".into(),
@@ -244,7 +237,11 @@ impl RawEvidenceRepositoryPort for RawEvidenceRepository {
             })?;
         // Merge outputs while preserving prior history (additive, deduped, ordered).
         for output in outputs {
-            if !metadata.generated_outputs.iter().any(|existing| existing == output) {
+            if !metadata
+                .generated_outputs
+                .iter()
+                .any(|existing| existing == output)
+            {
                 metadata.generated_outputs.push(output.clone());
             }
         }
@@ -258,10 +255,7 @@ impl RawEvidenceRepositoryPort for RawEvidenceRepository {
     }
 }
 
-fn resolve_available_evidence_id(
-    requested_id: &str,
-    metadata_dir: &Path,
-) -> DoreResult<String> {
+fn resolve_available_evidence_id(requested_id: &str, metadata_dir: &Path) -> DoreResult<String> {
     // If the requested id is already free, use it as-is.
     let candidate = metadata_dir.join(format!("{requested_id}.json"));
     if !candidate.exists() {
@@ -305,16 +299,16 @@ fn resolve_available_evidence_id(
     Ok(format!("{prefix}_{:04}", max_suffix + 1))
 }
 
-fn relative_path_under_runtime(layout: &RuntimeLayout, path: &std::path::Path) -> DoreResult<String> {
+fn relative_path_under_runtime(
+    layout: &RuntimeLayout,
+    path: &std::path::Path,
+) -> DoreResult<String> {
     let root = layout.runtime_root();
     let stripped = path
         .strip_prefix(root)
         .map_err(|_| DoreError::InvalidRuntimeRoot {
             path: path.to_path_buf(),
-            reason: format!(
-                "path is not within runtime root {}",
-                root.display()
-            ),
+            reason: format!("path is not within runtime root {}", root.display()),
         })?;
     Ok(stripped.to_string_lossy().replace('\\', "/"))
 }
@@ -404,7 +398,10 @@ mod tests {
 
         let second = repo.append(payload, metadata).unwrap();
         assert_ne!(second.metadata.evidence_id, first.metadata.evidence_id);
-        assert!(second.metadata.evidence_id.starts_with("evi_20260507_160000_"));
+        assert!(second
+            .metadata
+            .evidence_id
+            .starts_with("evi_20260507_160000_"));
         assert!(second.payload_path.exists());
         assert!(second.metadata_path.exists());
     }

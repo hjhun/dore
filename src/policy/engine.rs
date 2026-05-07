@@ -4,9 +4,7 @@ use crate::core::clock::Clock;
 use crate::core::error::{DoreError, DoreResult};
 use crate::core::ids::IdFactory;
 use crate::policy::defaults::PolicyDefaults;
-use crate::policy::model::{
-    PolicyAction, PolicyDecision, PolicyOutcome, PolicyRequest, SyncMode,
-};
+use crate::policy::model::{PolicyAction, PolicyDecision, PolicyOutcome, PolicyRequest, SyncMode};
 
 pub struct PolicyEngine {
     defaults: PolicyDefaults,
@@ -16,7 +14,11 @@ pub struct PolicyEngine {
 
 impl PolicyEngine {
     pub fn new(defaults: PolicyDefaults, clock: Arc<dyn Clock>, ids: Arc<dyn IdFactory>) -> Self {
-        Self { defaults, clock, ids }
+        Self {
+            defaults,
+            clock,
+            ids,
+        }
     }
 
     pub fn defaults(&self) -> &PolicyDefaults {
@@ -78,7 +80,10 @@ impl PolicyEngine {
         if matches!(request.action, PolicyAction::IngestRawEvidence) {
             let sensitivity = request.sensitivity.as_deref().unwrap_or("sensitive");
             if sensitivity == "secret"
-                && self.defaults.approval.raw_sensitive_access_requires_approval
+                && self
+                    .defaults
+                    .approval
+                    .raw_sensitive_access_requires_approval
                 && !request.approval_granted
             {
                 let decision = PolicyDecision {

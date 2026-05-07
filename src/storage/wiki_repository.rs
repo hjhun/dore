@@ -48,10 +48,11 @@ impl WikiRepositoryPort for WikiRepository {
                 path: target.clone(),
                 source,
             })?;
-        file.write_all(entry.as_bytes()).map_err(|source| DoreError::Io {
-            path: target.clone(),
-            source,
-        })?;
+        file.write_all(entry.as_bytes())
+            .map_err(|source| DoreError::Io {
+                path: target.clone(),
+                source,
+            })?;
         if !entry.ends_with('\n') {
             file.write_all(b"\n").map_err(|source| DoreError::Io {
                 path: target.clone(),
@@ -82,10 +83,10 @@ fn read_optional(path: &std::path::Path) -> DoreResult<Option<String>> {
         path: path.to_path_buf(),
         source,
     })?;
-    Ok(Some(
-        String::from_utf8(bytes).map_err(|err| DoreError::Serialization {
+    Ok(Some(String::from_utf8(bytes).map_err(|err| {
+        DoreError::Serialization {
             format: "utf-8".into(),
             message: err.to_string(),
-        })?,
-    ))
+        }
+    })?))
 }

@@ -37,10 +37,7 @@ impl MarkdownRenderer {
                     "  - Provenance: {}\n",
                     record.provenance.collector
                 ));
-                out.push_str(&format!(
-                    "  - Payload SHA-256: {}\n",
-                    record.payload.sha256
-                ));
+                out.push_str(&format!("  - Payload SHA-256: {}\n", record.payload.sha256));
             }
         }
         out.push_str("\n## Recent Changes\n\n");

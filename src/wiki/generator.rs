@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::core::clock::Clock;
 use crate::core::error::DoreResult;
-use crate::core::ids::IdFactory;
+use crate::core::ids::JobIdAllocator;
 use crate::jobs::reporter::{JobReport, JobStatus};
 use crate::storage::job_log_repository::JobLogRepositoryPort;
 use crate::storage::raw_evidence_repository::RawEvidenceRepositoryPort;
@@ -28,7 +28,7 @@ pub struct WikiGenerationService {
     job_log: Arc<dyn JobLogRepositoryPort>,
     renderer: MarkdownRenderer,
     clock: Arc<dyn Clock>,
-    ids: Arc<dyn IdFactory>,
+    job_ids: Arc<dyn JobIdAllocator>,
 }
 
 impl WikiGenerationService {
@@ -37,7 +37,7 @@ impl WikiGenerationService {
         wiki_repo: Arc<dyn WikiRepositoryPort>,
         job_log: Arc<dyn JobLogRepositoryPort>,
         clock: Arc<dyn Clock>,
-        ids: Arc<dyn IdFactory>,
+        job_ids: Arc<dyn JobIdAllocator>,
     ) -> Self {
         Self {
             raw_repo,
@@ -45,17 +45,16 @@ impl WikiGenerationService {
             job_log,
             renderer: MarkdownRenderer::new(),
             clock,
-            ids,
+            job_ids,
         }
     }
 
     pub fn generate(&self, _request: WikiGenerateRequest) -> DoreResult<WikiGenerateResult> {
         let started_at = self.clock.now();
-        let job_id = self.ids.job_id(started_at, "wiki");
+        let job_id = self.job_ids.allocate(started_at, "wiki")?;
 
         let records = self.raw_repo.list_metadata()?;
-        let evidence_ids: Vec<String> =
-            records.iter().map(|r| r.evidence_id.clone()).collect();
+        let evidence_ids: Vec<String> = records.iter().map(|r| r.evidence_id.clone()).collect();
 
         let index_body = self.renderer.render_index(started_at, &records);
         let index_path = self.wiki_repo.write_index(&index_body)?;

@@ -68,12 +68,11 @@ impl RuntimeInitializerPort for RuntimeInitializer {
 
         let snapshot_path = layout.policy_snapshot_json_path();
         let defaults = PolicyDefaults::embedded()?;
-        let snapshot_bytes = serde_json::to_vec_pretty(&defaults).map_err(|err| {
-            DoreError::Serialization {
+        let snapshot_bytes =
+            serde_json::to_vec_pretty(&defaults).map_err(|err| DoreError::Serialization {
                 format: "json".into(),
                 message: err.to_string(),
-            }
-        })?;
+            })?;
         atomic_write(&snapshot_path, &snapshot_bytes)?;
 
         Ok(RuntimeInitResult {
@@ -129,8 +128,7 @@ mod tests {
         assert!(toml_text.contains("schema_version = \"policy_defaults.v1\""));
 
         let snapshot_text = std::fs::read_to_string(&first.policy_snapshot_path).unwrap();
-        let snapshot_json: serde_json::Value =
-            serde_json::from_str(&snapshot_text).unwrap();
+        let snapshot_json: serde_json::Value = serde_json::from_str(&snapshot_text).unwrap();
         assert_eq!(snapshot_json["schema_version"], "policy_defaults.v1");
         assert_eq!(snapshot_json["local_only"], true);
         assert_eq!(snapshot_json["sync"]["cloud_sync_enabled"], false);

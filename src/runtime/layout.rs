@@ -16,6 +16,7 @@ pub const MEMORY_SUBDIRS: &[&str] = &[
     "memory/graph",
     "memory/graph/status",
     "memory/jobs",
+    "memory/jobs/_reserved",
     "memory/sync",
     "memory/policy",
     "memory/secrets",
@@ -92,6 +93,10 @@ impl RuntimeLayout {
         self.memory_root().join("jobs")
     }
 
+    pub fn jobs_reserved_dir(&self) -> PathBuf {
+        self.jobs_dir().join("_reserved")
+    }
+
     pub fn job_log_path(&self, kind: &str) -> PathBuf {
         self.jobs_dir().join(format!("{kind}.jsonl"))
     }
@@ -140,10 +145,7 @@ impl RuntimeLayout {
         } else {
             Err(DoreError::InvalidRuntimeRoot {
                 path: candidate.to_path_buf(),
-                reason: format!(
-                    "path must be under runtime root {}",
-                    root.display()
-                ),
+                reason: format!("path must be under runtime root {}", root.display()),
             })
         }
     }
@@ -152,17 +154,56 @@ impl RuntimeLayout {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    /// Serializes tests that mutate the `DORE_RUNTIME_ROOT` environment
+    /// variable. Cargo runs tests in parallel by default, so without this
+    /// mutex two tests can race on shared process-wide env state.
+    fn env_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Save and restore the env var around a test so a failure in one test
+    /// cannot strand a value that breaks the next.
+    struct EnvVarGuard {
+        key: &'static str,
+        previous: Option<String>,
+    }
+
+    impl EnvVarGuard {
+        fn capture(key: &'static str) -> Self {
+            Self {
+                key,
+                previous: std::env::var(key).ok(),
+            }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(value) => std::env::set_var(self.key, value),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
 
     #[test]
     fn resolve_runtime_root_prefers_cli_argument() {
+        let _guard = env_lock();
+        let _restore = EnvVarGuard::capture(RUNTIME_ROOT_ENV);
         std::env::set_var(RUNTIME_ROOT_ENV, "/should/not/be/used");
         let resolved = resolve_runtime_root(Some(Path::new("/explicit/cli")));
         assert_eq!(resolved, PathBuf::from("/explicit/cli"));
-        std::env::remove_var(RUNTIME_ROOT_ENV);
     }
 
     #[test]
     fn resolve_runtime_root_falls_back_to_default_when_unset() {
+        let _guard = env_lock();
+        let _restore = EnvVarGuard::capture(RUNTIME_ROOT_ENV);
         std::env::remove_var(RUNTIME_ROOT_ENV);
         let resolved = resolve_runtime_root(None);
         assert_eq!(resolved, PathBuf::from(DEFAULT_RUNTIME_ROOT));
@@ -171,8 +212,12 @@ mod tests {
     #[test]
     fn rejects_paths_outside_runtime_root() {
         let layout = RuntimeLayout::new("/runtime/root").unwrap();
-        assert!(layout.assert_within_root(Path::new("/runtime/root/memory/raw/notes/x.md")).is_ok());
-        assert!(layout.assert_within_root(Path::new("/somewhere/else")).is_err());
+        assert!(layout
+            .assert_within_root(Path::new("/runtime/root/memory/raw/notes/x.md"))
+            .is_ok());
+        assert!(layout
+            .assert_within_root(Path::new("/somewhere/else"))
+            .is_err());
     }
 
     #[test]

@@ -71,9 +71,7 @@ impl CommandProbe for SystemCommandProbe {
                 // Treat any failure to launch the candidate as "not available".
                 // Sandboxes may translate a missing binary into PermissionDenied
                 // instead of NotFound, and either way the command did not run.
-                std::io::ErrorKind::NotFound | std::io::ErrorKind::PermissionDenied => {
-                    Ok(None)
-                }
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::PermissionDenied => Ok(None),
                 _ => Err(DoreError::GraphifyProbeFailed {
                     command: command.into(),
                     reason: err.to_string(),
@@ -138,7 +136,11 @@ impl GraphifyAvailabilityChecker {
             let probe_result = self.probe.probe(command, &["--version"]);
             match probe_result {
                 Ok(Some(stdout)) => {
-                    let version = stdout.lines().next().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+                    let version = stdout
+                        .lines()
+                        .next()
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty());
                     let status = if version.is_some() {
                         GraphifyStatus::Installed
                     } else {
@@ -185,10 +187,7 @@ mod tests {
 
     impl CommandProbe for StubProbe {
         fn probe(&self, command: &str, _args: &[&str]) -> DoreResult<Option<String>> {
-            self.invocations
-                .lock()
-                .unwrap()
-                .push(command.to_string());
+            self.invocations.lock().unwrap().push(command.to_string());
             let mut q = self.responses.lock().unwrap();
             if q.is_empty() {
                 return Ok(None);
@@ -200,11 +199,8 @@ mod tests {
     #[test]
     fn reports_installed_when_command_returns_version_output() {
         let probe = Arc::new(StubProbe::new(vec![Ok(Some("graphify 1.2.3".into()))]));
-        let checker = GraphifyAvailabilityChecker::with_commands(
-            probe,
-            Some("graphify".into()),
-            vec![],
-        );
+        let checker =
+            GraphifyAvailabilityChecker::with_commands(probe, Some("graphify".into()), vec![]);
         let report = checker.check().unwrap();
         assert_eq!(report.status, GraphifyStatus::Installed);
         assert_eq!(report.command.as_deref(), Some("graphify"));
@@ -214,11 +210,8 @@ mod tests {
     #[test]
     fn reports_invokable_when_command_runs_but_no_version() {
         let probe = Arc::new(StubProbe::new(vec![Ok(Some(String::new()))]));
-        let checker = GraphifyAvailabilityChecker::with_commands(
-            probe,
-            Some("graphify".into()),
-            vec![],
-        );
+        let checker =
+            GraphifyAvailabilityChecker::with_commands(probe, Some("graphify".into()), vec![]);
         let report = checker.check().unwrap();
         assert_eq!(report.status, GraphifyStatus::Invokable);
     }

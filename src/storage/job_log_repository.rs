@@ -40,10 +40,11 @@ impl JobLogRepositoryPort for JobLogRepository {
                 path: path.clone(),
                 source,
             })?;
-        file.write_all(line.as_bytes()).map_err(|source| DoreError::Io {
-            path: path.clone(),
-            source,
-        })?;
+        file.write_all(line.as_bytes())
+            .map_err(|source| DoreError::Io {
+                path: path.clone(),
+                source,
+            })?;
         file.write_all(b"\n").map_err(|source| DoreError::Io {
             path: path.clone(),
             source,

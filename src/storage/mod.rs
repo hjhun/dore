@@ -6,7 +6,7 @@ pub mod wiki_repository;
 pub use artifact_store::atomic_write;
 pub use job_log_repository::{JobLogRepository, JobLogRepositoryPort};
 pub use raw_evidence_repository::{
-    Provenance, RawEvidenceMetadata, RawEvidenceRepository, RawEvidenceRepositoryPort,
-    RawPayload, RawPayloadDescriptor, StoredEvidence,
+    Provenance, RawEvidenceMetadata, RawEvidenceRepository, RawEvidenceRepositoryPort, RawPayload,
+    RawPayloadDescriptor, StoredEvidence,
 };
 pub use wiki_repository::{WikiRepository, WikiRepositoryPort};

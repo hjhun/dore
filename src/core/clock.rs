@@ -24,7 +24,10 @@ pub struct FixedClock {
 
 impl FixedClock {
     pub fn new(moments: Vec<DateTime<FixedOffset>>) -> Self {
-        assert!(!moments.is_empty(), "FixedClock requires at least one moment");
+        assert!(
+            !moments.is_empty(),
+            "FixedClock requires at least one moment"
+        );
         Self {
             moments: Mutex::new(moments),
             cursor: Mutex::new(0),
@@ -61,18 +64,9 @@ mod tests {
             "2026-05-07T16:00:00+00:00",
             "2026-05-07T16:00:01+00:00",
         ]);
-        assert_eq!(
-            clock.now().to_rfc3339(),
-            "2026-05-07T16:00:00+00:00"
-        );
-        assert_eq!(
-            clock.now().to_rfc3339(),
-            "2026-05-07T16:00:01+00:00"
-        );
+        assert_eq!(clock.now().to_rfc3339(), "2026-05-07T16:00:00+00:00");
+        assert_eq!(clock.now().to_rfc3339(), "2026-05-07T16:00:01+00:00");
         // Exhausted: clock pins to the final moment.
-        assert_eq!(
-            clock.now().to_rfc3339(),
-            "2026-05-07T16:00:01+00:00"
-        );
+        assert_eq!(clock.now().to_rfc3339(), "2026-05-07T16:00:01+00:00");
     }
 }
