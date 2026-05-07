@@ -120,10 +120,16 @@ GRAPHIFY_CMD=/definitely/not/graphify cargo run -- graphify check
 
 ## Sync, export, and approval
 
-Sync and export require explicit approval. Use `--sync-mode cloud
---approve` to opt in for a single command. Without approval the policy
-engine denies the action and writes a denial entry to the job log
-without writing the raw payload.
+Cloud sync is **not available in this slice**. The embedded policy
+defaults set `sync.cloud_sync_enabled = false`, so the policy engine
+denies any `--sync-mode cloud` request even when `--approve` is
+passed. The denial is recorded in the job log and the raw payload is
+not written.
+
+Export is gated by approval. Pass `--sync-mode export --approve` to
+opt in for a single command. Without `--approve`, the engine denies
+the action and writes a denial entry to the job log without writing
+the raw payload.
 
 ## Repository layout
 
