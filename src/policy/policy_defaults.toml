@@ -1,0 +1,23 @@
+schema_version = "policy_defaults.v1"
+local_only = true
+
+[retention]
+default_class = "standard"
+standard_days = 3650
+destructive_cleanup_enabled = false
+
+[redaction]
+default_profile = "default"
+store_raw_payload = true
+redact_secrets = true
+redact_access_tokens = true
+
+[sync]
+default_mode = "local_only"
+cloud_sync_enabled = false
+
+[approval]
+export_requires_approval = true
+cloud_sync_requires_approval = true
+raw_sensitive_access_requires_approval = true
+deny_unapproved_unsafe_actions = true

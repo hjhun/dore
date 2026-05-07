@@ -1,3 +1,33 @@
 # Operational workflow state must live in the dormammu workspace, not the repo.
 .dev/
 .tmp/
+
+# Rust build artifacts.
+/target/
+**/*.rs.bk
+
+# Default Dore private runtime memory roots.
+# These directories hold raw personal evidence, generated private memory,
+# transcripts, recordings, secrets, graph outputs, sync state, and job
+# reports. They must never be committed.
+.dore-local/
+.dore-local-smoke/
+.dore-local-*/
+
+# Belt-and-suspenders patterns to catch private runtime artifacts even when
+# created outside the default roots. These cover memory subdirectories used
+# by the LLM Wiki scaffold.
+**/.dore-local/
+**/.dore-local-*/
+**/memory/raw/
+**/memory/transcripts/
+**/memory/recordings/
+**/memory/secrets/
+**/memory/digest/
+**/memory/graph/
+**/memory/sync/
+**/memory/jobs/
+**/memory/tmp/
+**/memory/policy/
+**/memory/wiki/index.md
+**/memory/wiki/log.md
