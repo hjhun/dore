@@ -12,7 +12,19 @@ import {
 } from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
 import { createTelegramAdapterStatus } from "../../../packages/telegram/src/index.js";
-import { createTradingStatus, loadWatchlistStore, summarizeDryRunJournal } from "../../../packages/trading/src/index.js";
+import {
+  appendDryRunJournalEntry,
+  createDryRunJournalEntry,
+  createTradingSignal,
+  createTradingStatus,
+  ensureRealTradingBlocked,
+  loadWatchlistStore,
+  runRiskCheck,
+  summarizeDryRunJournal,
+  type ExecutionMode,
+  type Market,
+  type SimulatedOrder
+} from "../../../packages/trading/src/index.js";
 
 export interface DaemonAppOptions {
   startedAt?: Date;
@@ -110,6 +122,95 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
   });
 
   app.get("/trading/status", async () => createLocalTradingStatus(memoryRoot, startedAt));
+
+  app.post("/trading/signals/dry-run", async (request, reply) => {
+    const payload = request.body as Record<string, unknown> | null;
+    const executionMode = stringField(payload, "execution_mode", "dry_run") as ExecutionMode;
+    if (executionMode === "real") {
+      try {
+        ensureRealTradingBlocked({
+          realTradingEnabled: false,
+          requestedExecutionMode: executionMode
+        });
+      } catch {
+        return reply.code(400).send({
+          error: "real_trading_disabled"
+        });
+      }
+    }
+    if (executionMode !== "dry_run") {
+      return reply.code(400).send({
+        error: "dry_run_execution_required"
+      });
+    }
+
+    const simulatedOrder = simulatedOrderFromPayload(payload);
+    if (!simulatedOrder) {
+      return reply.code(400).send({
+        error: "simulated_order_required"
+      });
+    }
+
+    const now = stringField(payload, "now", new Date().toISOString());
+    const market = stringField(payload, "market") as Market;
+    const symbol = stringField(payload, "symbol");
+    if (!isMarket(market) || !symbol) {
+      return reply.code(400).send({
+        error: "signal_input_required"
+      });
+    }
+    const riskCheck = runRiskCheck({
+      now,
+      dataTimestamp: stringField(payload, "data_timestamp", now),
+      executionMode,
+      realTradingEnabled: false,
+      marketOpen: booleanField(payload, "market_open", false),
+      orderAmountKrwEquivalent: numberField(payload, "order_amount_krw_equivalent", 0),
+      dailyNewBuyKrwEquivalent: numberField(payload, "daily_new_buy_krw_equivalent", 0),
+      policy: {
+        maxOrderKrwEquivalent: 1_000_000,
+        maxDailyNewBuyKrwEquivalent: 3_000_000,
+        maxDataAgeMs: 15 * 60 * 1000,
+        killSwitchEnabled: false
+      }
+    });
+    let signal: ReturnType<typeof createTradingSignal>;
+    try {
+      signal = createTradingSignal({
+        signalId: stringField(payload, "signal_id", createSignalId(now, market, symbol)),
+        createdAt: now,
+        market,
+        symbol,
+        strategyId: stringField(payload, "strategy_id", "manual_watch"),
+        direction: stringField(payload, "direction", "watch") as "buy" | "sell" | "hold" | "reduce" | "watch",
+        confidence: stringField(payload, "confidence", "low") as "low" | "medium" | "high",
+        reason: stringField(payload, "reason", "Manual dry-run candidate."),
+        dataTimestamp: stringField(payload, "data_timestamp", now),
+        sourceRefs: stringArrayField(payload, "source_refs", ["manual"]),
+        riskCheck,
+        recommendedAction: stringField(payload, "recommended_action", "Record dry-run candidate only."),
+        executionMode,
+        expiresAt: stringField(payload, "expires_at", now)
+      });
+    } catch {
+      return reply.code(400).send({
+        error: "signal_input_invalid"
+      });
+    }
+    const journal = await appendDryRunJournalEntry(
+      memoryRoot,
+      createDryRunJournalEntry({
+        signal,
+        createdAt: now,
+        simulatedOrder
+      })
+    );
+
+    return reply.code(201).send({
+      signal,
+      journal
+    });
+  });
 
   app.post("/engineering/intake", async (request, reply) => {
     const payload = request.body as { idea?: unknown; requested_by?: unknown; now?: unknown } | null;
@@ -278,6 +379,68 @@ async function createLocalTradingStatus(memoryRoot: string, now: Date) {
     watchlist: watchlist.items,
     dryRunJournal: await summarizeDryRunJournal(memoryRoot, month)
   });
+}
+
+function stringField(payload: Record<string, unknown> | null, key: string, fallback = ""): string {
+  const value = payload?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function stringArrayField(payload: Record<string, unknown> | null, key: string, fallback: string[]): string[] {
+  const value = payload?.[key];
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const strings = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return strings.length > 0 ? strings.map((item) => item.trim()) : fallback;
+}
+
+function numberField(payload: Record<string, unknown> | null, key: string, fallback: number): number {
+  const value = payload?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function booleanField(payload: Record<string, unknown> | null, key: string, fallback: boolean): boolean {
+  const value = payload?.[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function simulatedOrderFromPayload(payload: Record<string, unknown> | null): SimulatedOrder | null {
+  const value = payload?.simulated_order;
+  if (!isRecord(value)) {
+    return null;
+  }
+  const side = typeof value.side === "string" ? value.side : "";
+  const quantity = typeof value.quantity === "number" && Number.isFinite(value.quantity) ? value.quantity : 0;
+  const estimatedPrice =
+    typeof value.estimated_price === "number" && Number.isFinite(value.estimated_price) ? value.estimated_price : 0;
+  const currency = typeof value.currency === "string" ? value.currency : "";
+  if ((side !== "buy" && side !== "sell") || quantity <= 0 || estimatedPrice <= 0) {
+    return null;
+  }
+  if (currency !== "KRW" && currency !== "USD") {
+    return null;
+  }
+  return {
+    side,
+    quantity,
+    estimatedPrice,
+    currency
+  };
+}
+
+function isMarket(value: string): value is Market {
+  return value === "korea" || value === "us";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function createSignalId(now: string, market: Market, symbol: string): string {
+  const timestamp = now.replace(/\D/g, "").slice(0, 14) || "manual";
+  const safeSymbol = symbol.trim().replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "UNKNOWN";
+  return `signal_${timestamp}_${market}_${safeSymbol}_manual`;
 }
 
 function isAllowedEngineeringCommand(command: string): boolean {

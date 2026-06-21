@@ -195,7 +195,8 @@ Status:
 - Daemon trading status includes dry-run journal summary for the current month.
 - Desktop Dashboard maps and renders dry-run journal summary from daemon status.
 - Watchlists can be persisted under local memory data and restored into daemon trading status.
-- Remaining work is optional manual signal creation routes and an M5 acceptance audit.
+- Manual dry-run signal creation route records signals and journal entries while rejecting real execution mode.
+- Remaining work is an M5 acceptance audit.
 
 Deliverables:
 
@@ -208,6 +209,7 @@ Deliverables:
 - signal object.
 - risk manager.
 - dry-run journal.
+- manual dry-run signal route.
 
 Acceptance:
 
@@ -215,6 +217,7 @@ Acceptance:
 - signal and dry-run journal entries are created.
 - `real_trading_enabled: false` prevents every real order path.
 - risk rule tests pass.
+- manual signal creation route rejects real execution mode.
 
 ### M6: Pilot Real Trading Preparation
 

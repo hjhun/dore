@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M5, Trading Watch and Dry-run
-- Current task: safe watchlist persistence implemented; next is optional manual signal route
+- Current task: manual dry-run signal route implemented; next is M5 acceptance audit
 
 ## Milestone Progress
 
@@ -88,6 +88,8 @@ Update it whenever development state changes.
 - [x] M5 dry-run journal summary visible in desktop Dashboard.
 - [x] M5 watchlist persistence implemented.
 - [x] M5 persisted watchlist is visible in daemon trading status.
+- [x] M5 manual dry-run trading signal route implemented.
+- [x] M5 manual dry-run route rejects real execution mode.
 
 ## M0 Checklist
 
@@ -199,6 +201,8 @@ Update it whenever development state changes.
 - [x] Desktop Dashboard shows dry-run journal summary.
 - [x] Watchlist can be persisted under local memory data.
 - [x] Persisted watchlist items are exposed in daemon trading status.
+- [x] Manual dry-run route creates trading signals and journal entries.
+- [x] Manual dry-run route rejects real execution mode.
 
 ## Verification Log
 
@@ -321,6 +325,12 @@ Update it whenever development state changes.
 - 2026-06-22: Docs relative link check passed after M5 watchlist persistence docs update.
 - 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 - 2026-06-22: M5 watchlist persistence pushed to `origin/codex/add-agent-development-guide` at commit `7674909`.
+- 2026-06-22: M5 manual dry-run route TDD red phase confirmed with missing `POST /trading/signals/dry-run`.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 15 files and 79 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M5 manual dry-run route work.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 manual dry-run route work.
+- 2026-06-22: Docs relative link check passed after M5 manual dry-run route docs update.
+- 2026-06-22: Changed-file secret-like scan found no plaintext secret values.
 
 ## Known Constraints
 
@@ -333,6 +343,5 @@ Update it whenever development state changes.
 
 Continue M5 Trading Watch and Dry-run:
 
-1. Add a manual trading signal creation route if needed.
-2. Add a M5 completion audit against roadmap acceptance.
-3. Keep all real broker/order paths blocked until user supplies official API details.
+1. Add a M5 completion audit against roadmap acceptance.
+2. Keep all real broker/order paths blocked until user supplies official API details.

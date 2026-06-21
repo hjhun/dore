@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -153,5 +153,98 @@ describe("daemon status", () => {
         symbol: "005930"
       })
     );
+  });
+
+  it("creates a manual dry-run trading signal and journal entry", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-trading-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      startedAt: new Date("2026-06-22T00:00:00.000Z")
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/trading/signals/dry-run",
+      payload: {
+        signal_id: "signal_20260622_AAPL_manual",
+        now: "2026-06-22T09:00:00.000Z",
+        market: "us",
+        symbol: "aapl",
+        strategy_id: "manual_watch",
+        direction: "watch",
+        confidence: "low",
+        reason: "Manual dry-run candidate.",
+        data_timestamp: "2026-06-22T08:59:00.000Z",
+        source_refs: ["manual"],
+        recommended_action: "Record dry-run candidate only.",
+        expires_at: "2026-06-22T15:30:00.000Z",
+        market_open: true,
+        order_amount_krw_equivalent: 50_000,
+        daily_new_buy_krw_equivalent: 50_000,
+        simulated_order: {
+          side: "buy",
+          quantity: 1,
+          estimated_price: 100,
+          currency: "USD"
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json();
+    expect(body.signal).toMatchObject({
+      signal_id: "signal_20260622_AAPL_manual",
+      symbol: "AAPL",
+      execution_mode: "dry_run",
+      risk_check: {
+        status: "pass",
+        reasons: []
+      }
+    });
+    expect(body.journal.entry).toMatchObject({
+      signal_id: "signal_20260622_AAPL_manual",
+      execution_mode: "dry_run",
+      simulated_order: {
+        side: "buy",
+        quantity: 1
+      }
+    });
+    expect(await readFile(body.journal.path, "utf8")).toContain("signal_20260622_AAPL_manual");
+  });
+
+  it("rejects real execution mode through the manual dry-run route", async () => {
+    const app = createDaemonApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/trading/signals/dry-run",
+      payload: {
+        signal_id: "signal_20260622_AAPL_real",
+        now: "2026-06-22T09:00:00.000Z",
+        market: "us",
+        symbol: "AAPL",
+        strategy_id: "manual_watch",
+        direction: "watch",
+        confidence: "low",
+        reason: "Manual real candidate.",
+        data_timestamp: "2026-06-22T08:59:00.000Z",
+        source_refs: ["manual"],
+        execution_mode: "real",
+        market_open: true,
+        order_amount_krw_equivalent: 50_000,
+        daily_new_buy_krw_equivalent: 50_000,
+        simulated_order: {
+          side: "buy",
+          quantity: 1,
+          estimated_price: 100,
+          currency: "USD"
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "real_trading_disabled"
+    });
   });
 });
