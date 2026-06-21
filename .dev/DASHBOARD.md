@@ -51,7 +51,7 @@ Update it whenever development state changes.
 - [x] M3 Logs view implemented.
 - [x] M3 Settings status implemented.
 - [x] M3 approval decisions implemented.
-- [ ] M3 branch pushed.
+- [x] M3 branch pushed.
 
 ## M0 Checklist
 
@@ -170,6 +170,7 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 11 files and 31 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after approval decision implementation.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed after approval decision implementation.
+- 2026-06-21: M3 approval decisions pushed to `origin/codex/add-agent-development-guide` at commit `dcb4f6b`.
 
 ## Known Constraints
 
