@@ -45,6 +45,10 @@ importers:
 
   packages/model-gateway: {}
 
+  packages/scheduler: {}
+
+  packages/telegram: {}
+
 packages:
 
   '@esbuild/aix-ppc64@0.27.7':

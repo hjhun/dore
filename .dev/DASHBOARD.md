@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M2, Scheduler and Telegram MVP
-- Current task: add scheduler and Telegram command foundation after completing manual daily briefing
+- Current task: extend M2 from pure scheduler/Telegram command foundation to daemon integration
 
 ## Milestone Progress
 
@@ -33,6 +33,14 @@ Update it whenever development state changes.
 - [x] M1 `pnpm briefing:run` writes Markdown and JSON daily logs.
 - [x] M1 usage JSONL record written.
 - [x] M1 branch pushed.
+- [x] M2 scheduler tests added.
+- [x] M2 daily 06:00 KST job registration implemented.
+- [x] M2 Telegram allowlist tests added.
+- [x] M2 Telegram command skeleton implemented for `/status`, `/briefing`, `/usage`, `/stop`.
+- [x] M2 daemon scheduler integration implemented.
+- [x] M2 Telegram adapter safety status implemented.
+- [ ] M2 Telegram long polling adapter implemented.
+- [ ] M2 branch pushed.
 
 ## M0 Checklist
 
@@ -65,6 +73,22 @@ Update it whenever development state changes.
 - [x] Market data remains placeholder/not configured until user supplies broker/data details.
 - [x] Real trading remains disabled.
 
+## M2 Checklist
+
+- [x] `packages/scheduler` exists.
+- [x] Scheduler rejects invalid time formats.
+- [x] Scheduler registers `daily_briefing_0600_kst` at `06:00` `Asia/Seoul`.
+- [x] `packages/telegram` exists.
+- [x] Telegram command handler ignores all commands when allowlist is empty.
+- [x] Telegram command handler rejects users outside the allowlist.
+- [x] Telegram command handler routes `/status`.
+- [x] Telegram command handler routes `/briefing`.
+- [x] Telegram command handler routes `/usage`.
+- [x] Telegram command handler routes `/stop`.
+- [x] Daemon exposes scheduled job status.
+- [x] Telegram adapter is disabled without token or allowlist.
+- [ ] Telegram long polling network loop is wired.
+
 ## Verification Log
 
 - 2026-06-21: Docs relative link check passed before plan work.
@@ -79,6 +103,11 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
 - 2026-06-21: `DORE_MEMORY_ROOT=/tmp/dore-briefing-test npx --yes pnpm@11.8.0 briefing:run` created Markdown, JSON, and usage JSONL outputs.
 - 2026-06-21: M1 manual daily briefing pushed to `origin/codex/add-agent-development-guide` at commit `81b4fba`.
+- 2026-06-21: M2 TDD red phase confirmed with missing scheduler/telegram implementation files.
+- 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 9 files and 20 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
+- 2026-06-21: M2 daemon scheduler and Telegram adapter safety tests added; `npx --yes pnpm@11.8.0 test` passed, 9 files and 21 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after M2 daemon integration.
 
 ## Known Constraints
 
@@ -89,9 +118,9 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Start M2 scheduler and Telegram foundation:
+Continue M2 Telegram long polling shell:
 
-1. Add scheduler tests for 06:00 KST job registration.
-2. Add Telegram allowlist tests.
-3. Implement daemon scheduler module.
-4. Implement Telegram command skeleton for `/status`, `/briefing`, `/usage`, and `/stop`.
+1. Add tests for a long polling adapter shell that does not start when disabled.
+2. Add adapter start/stop lifecycle without real network calls.
+3. Connect adapter status into daemon status.
+4. Keep real Telegram network calls out of tests.

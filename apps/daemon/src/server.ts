@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
 
 export interface DaemonAppOptions {
   startedAt?: Date;
@@ -12,6 +13,11 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
 
   app.get("/status", async () => {
     const uptime_ms = Date.now() - startedAt.getTime();
+    const scheduler = new InMemoryScheduleRegistry();
+    createDailyBriefingJob(scheduler, {
+      time: "06:00",
+      timezone: "Asia/Seoul"
+    });
 
     return {
       app: {
@@ -40,6 +46,9 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
         configured: Boolean(process.env.TELEGRAM_BOT_TOKEN),
         allowlist_required: true
       },
+      scheduler: {
+        jobs: scheduler.list()
+      },
       trading: {
         enabled: true,
         real_trading_enabled: false,
@@ -54,4 +63,3 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
 
   return app;
 }
-
