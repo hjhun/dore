@@ -202,6 +202,7 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 review summary, persistence, and CLI work.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 review summary, persistence, and CLI work.
 - 2026-06-22: `DORE_MEMORY_ROOT=/tmp/dore-engineering-cli-test DORE_NOW=2026-06-22T00:00:00.000Z npx --yes pnpm@11.8.0 engineering:intake "Add review summary CLI"` wrote requirements, technical design, change plan, intake JSON, and event JSONL.
+- 2026-06-22: M4 review summary, draft persistence, and CLI entrypoint pushed to `origin/codex/add-agent-development-guide` at commit `f8e723c`.
 
 ## Known Constraints
 
