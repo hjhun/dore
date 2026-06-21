@@ -33,6 +33,8 @@ importers:
 
   apps/daemon: {}
 
+  packages/briefing: {}
+
   packages/config: {}
 
   packages/contracts: {}

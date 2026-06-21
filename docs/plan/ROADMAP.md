@@ -55,6 +55,12 @@ Goal:
 
 - Generate a local briefing manually before scheduler and Telegram automation.
 
+Status:
+
+- Implemented in `packages/briefing` with deterministic fallback generation and `pnpm briefing:run`.
+- Market and broker data are placeholders until the user supplies securities/API details.
+- LLM credentials are optional; missing credentials produce a partial local briefing.
+
 Deliverables:
 
 - source collectors for repo, memory, tasks, approvals, usage, and market placeholders.
@@ -188,4 +194,3 @@ Implement in this order:
 6. model routing and tests.
 7. daemon `/status` and tests.
 8. doctor command and manual verification.
-

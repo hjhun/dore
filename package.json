@@ -10,7 +10,7 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "doctor": "tsx apps/daemon/src/doctor.ts",
     "dev:daemon": "tsx apps/daemon/src/main.ts",
-    "briefing:run": "tsx apps/daemon/src/briefing-placeholder.ts"
+    "briefing:run": "tsx apps/daemon/src/briefing-run.ts"
   },
   "dependencies": {
     "fastify": "^5.2.1",
