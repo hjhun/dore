@@ -287,6 +287,30 @@ export async function appendReviewSummaryEvent(
   });
 }
 
+export async function appendTestExecutionEvent(
+  eventLogPath: string,
+  intake: ProjectIntake,
+  execution: TestExecutionRecord
+): Promise<void> {
+  const passed = execution.status === "passed";
+  await appendEvent(eventLogPath, {
+    id: `event_${intake.id}_${slugify(execution.command)}`,
+    time: new Date().toISOString(),
+    actor: "dore",
+    event_type: "task_completed",
+    entity_type: "task",
+    entity_id: intake.id,
+    summary: `Engineering verification ${passed ? "passed" : "failed"}: ${execution.command}`,
+    risk_level: "write",
+    refs: ["engineering_execution"],
+    command: execution.command,
+    status: execution.status,
+    exit_code: execution.exitCode,
+    duration_ms: execution.durationMs,
+    output_summary: execution.outputSummary
+  });
+}
+
 export async function persistProjectIntakeDrafts(
   memoryRoot: string,
   intake: ProjectIntake

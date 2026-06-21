@@ -39,6 +39,14 @@ export interface DashboardStatus {
     memory: "ready" | "missing";
     trading: "dry_run" | "real_enabled";
   };
+  engineering: {
+    tasks: Array<{
+      id: string;
+      title: string;
+      status: string;
+      lastCommand?: string;
+    }>;
+  };
 }
 
 type ApprovalDecision = "approved" | "rejected";
@@ -95,6 +103,16 @@ export function createMockDashboardStatus(): DashboardStatus {
       telegram: "missing",
       memory: "ready",
       trading: "dry_run"
+    },
+    engineering: {
+      tasks: [
+        {
+          id: "intake_demo_001",
+          title: "Review generated plan",
+          status: "planned",
+          lastCommand: "pnpm test"
+        }
+      ]
     }
   };
 }
@@ -205,6 +223,21 @@ export function Dashboard({ status }: { status: DashboardStatus }) {
               <div key={log.id} style={styles.stack}>
                 <p>{log.eventType}</p>
                 <p>{log.summary}</p>
+              </div>
+            ))
+          )}
+        </StatusPanel>
+
+        <StatusPanel title="Engineering">
+          {status.engineering.tasks.length === 0 ? (
+            <p>No engineering tasks</p>
+          ) : (
+            status.engineering.tasks.map((task) => (
+              <div key={task.id} style={styles.stack}>
+                <p>{task.id}</p>
+                <p>{task.title}</p>
+                <p>Status: {task.status}</p>
+                {task.lastCommand ? <p>Last command: {task.lastCommand}</p> : null}
               </div>
             ))
           )}

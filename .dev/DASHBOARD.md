@@ -65,6 +65,9 @@ Update it whenever development state changes.
 - [x] M4 engineering intake CLI entrypoint implemented.
 - [x] M4 engineering intake daemon route implemented.
 - [x] M4 review summary can be logged as task completion event.
+- [x] M4 test execution outcomes can be logged against engineering tasks.
+- [x] M4 engineering task status is exposed through daemon `/status`.
+- [x] M4 engineering task status is visible in the desktop Dashboard.
 
 ## M0 Checklist
 
@@ -149,7 +152,10 @@ Update it whenever development state changes.
 - [x] `pnpm engineering:intake` CLI entrypoint exists.
 - [x] `POST /engineering/intake` daemon route exists.
 - [x] Review summary outcomes can be recorded in append-only task logs.
-- [ ] Small repo change can be planned, implemented, tested, and logged through daemon/task logs.
+- [x] Test execution outcomes can be recorded in append-only task logs.
+- [x] Engineering task status is exposed in daemon `/status`.
+- [x] Engineering task status is visible in the desktop Dashboard.
+- [ ] Small repo change can be executed from the agent workflow and fully logged through daemon/task logs.
 
 ## Verification Log
 
@@ -212,6 +218,10 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 daemon route and review task log work.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 daemon route and review task log work.
 - 2026-06-22: M4 daemon intake route and review task log pushed to `origin/codex/add-agent-development-guide` at commit `59ad09a`.
+- 2026-06-22: M4 execution outcome, daemon status, and desktop Engineering panel tests added; TDD red phase confirmed for missing `appendTestExecutionEvent`, execution route, status mapping, and Engineering panel.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 14 files and 49 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 execution outcome/status/dashboard work.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 execution outcome/status/dashboard work.
 
 ## Known Constraints
 
@@ -224,6 +234,6 @@ Update it whenever development state changes.
 
 Start M4 Development Agent MVP:
 
-1. Add execution workflow that records implementation/test outcomes against the task log.
+1. Add a controlled implementation executor skeleton for small repo changes.
 2. Connect review summaries to the generated intake artifacts.
-3. Expose M4 task status in daemon `/status` or desktop dashboard.
+3. Persist engineering task history across daemon restarts.

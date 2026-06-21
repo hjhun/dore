@@ -43,6 +43,18 @@ describe("daemon engineering routes", () => {
     expect(body.drafts.requirements).toContain("/operations/engineering/");
     expect(await readFile(body.drafts.requirements, "utf8")).toContain("Add daemon task wrapper");
     expect(await readFile(body.event_log, "utf8")).toContain("Engineering intake planned");
+
+    const statusResponse = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+    expect(statusResponse.json().engineering.tasks).toContainEqual(
+      expect.objectContaining({
+        id: "intake_2026_06_22_add_daemon_task_wrapper",
+        title: "Add daemon task wrapper",
+        status: "planned"
+      })
+    );
   });
 
   it("rejects empty engineering intake ideas", async () => {
@@ -58,5 +70,60 @@ describe("daemon engineering routes", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error).toBe("idea_required");
+  });
+
+  it("records engineering execution outcomes and updates task status", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot: "/workspace/dore",
+      engineeringExecFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/m4\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      }
+    });
+
+    const intakeResponse = await app.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Record execution route",
+        now: "2026-06-22T00:00:00.000Z"
+      }
+    });
+    const taskId = intakeResponse.json().task_id;
+
+    const executionResponse = await app.inject({
+      method: "POST",
+      url: `/engineering/tasks/${taskId}/executions`,
+      payload: {
+        command: "pnpm test",
+        exit_code: 0,
+        started_at: "2026-06-22T00:00:00.000Z",
+        completed_at: "2026-06-22T00:00:02.000Z",
+        output: "ok"
+      }
+    });
+
+    expect(executionResponse.statusCode).toBe(201);
+    expect(executionResponse.json().task_status).toBe("completed");
+    expect(await readFile(executionResponse.json().event_log, "utf8")).toContain("Engineering verification passed");
+
+    const statusResponse = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+    expect(statusResponse.json().engineering.tasks).toContainEqual(
+      expect.objectContaining({
+        id: taskId,
+        status: "completed",
+        last_command: "pnpm test"
+      })
+    );
   });
 });

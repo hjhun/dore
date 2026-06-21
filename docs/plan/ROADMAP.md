@@ -151,7 +151,9 @@ Status:
 - `pnpm engineering:intake` provides a local CLI entrypoint for generating drafts and event logs.
 - `POST /engineering/intake` provides a daemon task wrapper for generating drafts and event logs.
 - Review summary outcomes can be recorded as append-only task completion events.
-- Remaining work is recording implementation/test outcomes against task logs and exposing engineering task status in daemon/dashboard views.
+- Test execution outcomes can be recorded against engineering tasks.
+- Engineering task status is exposed through daemon `/status` and the desktop Dashboard.
+- Remaining work is a controlled implementation executor skeleton and persistent engineering task history.
 
 Deliverables:
 

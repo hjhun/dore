@@ -16,8 +16,10 @@ describe("Dashboard", () => {
     expect(screen.getByText("Approvals")).toBeTruthy();
     expect(screen.getByText("Logs")).toBeTruthy();
     expect(screen.getByText("Settings")).toBeTruthy();
+    expect(screen.getByText("Engineering")).toBeTruthy();
     expect(screen.getByText("approval_demo_001")).toBeTruthy();
     expect(screen.getByText("daemon_status_loaded")).toBeTruthy();
+    expect(screen.getByText("intake_demo_001")).toBeTruthy();
     expect(screen.getByText("OpenAI: missing")).toBeTruthy();
     expect(screen.getByText("Memory: ready")).toBeTruthy();
   });

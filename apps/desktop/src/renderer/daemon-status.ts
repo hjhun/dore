@@ -43,6 +43,14 @@ export interface DaemonStatusPayload {
     real_trading_enabled: boolean;
     brokers: Record<string, string>;
   };
+  engineering?: {
+    tasks: Array<{
+      id: string;
+      title: string;
+      status: string;
+      last_command?: string;
+    }>;
+  };
 }
 
 export interface FetchDashboardStatusOptions {
@@ -84,6 +92,15 @@ export function mapDaemonStatusToDashboard(payload: DaemonStatusPayload): Dashbo
       telegram: payload.telegram?.configured ? "configured" : "missing",
       memory: payload.memory?.ready ? "ready" : "missing",
       trading: payload.trading.real_trading_enabled ? "real_enabled" : "dry_run"
+    },
+    engineering: {
+      tasks:
+        payload.engineering?.tasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          status: task.status,
+          lastCommand: task.last_command
+        })) ?? []
     }
   };
 }
@@ -135,6 +152,9 @@ export function createOfflineDashboardStatus(): DashboardStatus {
       telegram: "missing",
       memory: "missing",
       trading: "dry_run"
+    },
+    engineering: {
+      tasks: []
     }
   };
 }

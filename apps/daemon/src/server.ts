@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import { resolve } from "node:path";
-import type { ExecFileResult, PackageJsonLike } from "../../../packages/engineering/src/index.js";
-import { runEngineeringIntake } from "../../../packages/engineering/src/index.js";
+import type { ExecFileResult, PackageJsonLike, ProjectIntake } from "../../../packages/engineering/src/index.js";
+import { appendTestExecutionEvent, createTestExecutionRecord, runEngineeringIntake } from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
 import { createTelegramAdapterStatus } from "../../../packages/telegram/src/index.js";
 
@@ -18,6 +18,15 @@ export interface DaemonAppOptions {
 export function createDaemonApp(options: DaemonAppOptions = {}) {
   const startedAt = options.startedAt ?? new Date();
   const app = Fastify({ logger: false });
+  const engineeringTasks = new Map<
+    string,
+    {
+      intake: ProjectIntake;
+      status: "planned" | "completed" | "failed";
+      eventLogPath: string;
+      lastCommand?: string;
+    }
+  >();
 
   app.get("/status", async () => {
     const uptime_ms = Date.now() - startedAt.getTime();
@@ -70,6 +79,14 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
           shinhan: "candidate",
           samsung: "read_only_manual_reference"
         }
+      },
+      engineering: {
+        tasks: Array.from(engineeringTasks.values()).map((task) => ({
+          id: task.intake.id,
+          title: task.intake.projectName,
+          status: task.status,
+          last_command: task.lastCommand
+        }))
       }
     };
   });
@@ -92,6 +109,11 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       packageJson: options.packageJson,
       execFile: options.engineeringExecFile
     });
+    engineeringTasks.set(result.intake.id, {
+      intake: result.intake,
+      status: "planned",
+      eventLogPath: result.eventLogPath
+    });
 
     return reply.code(201).send({
       task_id: result.intake.id,
@@ -103,6 +125,48 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
         intake_json: result.drafts.intakeJsonPath
       },
       event_log: result.eventLogPath
+    });
+  });
+
+  app.post("/engineering/tasks/:id/executions", async (request, reply) => {
+    const params = request.params as { id?: string };
+    const task = params.id ? engineeringTasks.get(params.id) : undefined;
+    if (!task) {
+      return reply.code(404).send({
+        error: "task_not_found"
+      });
+    }
+
+    const payload = request.body as {
+      command?: unknown;
+      exit_code?: unknown;
+      started_at?: unknown;
+      completed_at?: unknown;
+      output?: unknown;
+    } | null;
+    const command = typeof payload?.command === "string" && payload.command.trim() ? payload.command.trim() : "";
+    if (!command) {
+      return reply.code(400).send({
+        error: "command_required"
+      });
+    }
+
+    const execution = createTestExecutionRecord({
+      command,
+      exitCode: typeof payload?.exit_code === "number" ? payload.exit_code : 1,
+      startedAt: typeof payload?.started_at === "string" ? payload.started_at : new Date().toISOString(),
+      completedAt: typeof payload?.completed_at === "string" ? payload.completed_at : new Date().toISOString(),
+      output: typeof payload?.output === "string" ? payload.output : ""
+    });
+    await appendTestExecutionEvent(task.eventLogPath, task.intake, execution);
+    task.status = execution.status === "passed" ? "completed" : "failed";
+    task.lastCommand = execution.command;
+
+    return reply.code(201).send({
+      task_id: task.intake.id,
+      task_status: task.status,
+      execution,
+      event_log: task.eventLogPath
     });
   });
 

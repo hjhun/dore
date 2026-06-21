@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
   appendReviewSummaryEvent,
+  appendTestExecutionEvent,
   appendProjectIntakeEvent,
   createProjectIntake,
   createReviewSummary,
@@ -285,5 +286,36 @@ describe("engineering project intake", () => {
       summary: "Engineering review summary: ready_for_review"
     });
     expect(record.verification_passed).toEqual(["pnpm test"]);
+  });
+
+  it("logs test execution records against an engineering task", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-"));
+    const eventLogPath = join(memoryRoot, "logs", "events", "engineering.jsonl");
+    const intake = createProjectIntake({
+      idea: "Record execution outcome",
+      requestedBy: "hjhun",
+      now: "2026-06-22T00:00:00.000Z"
+    });
+    const execution = createTestExecutionRecord({
+      command: "pnpm test",
+      exitCode: 0,
+      startedAt: "2026-06-22T00:00:00.000Z",
+      completedAt: "2026-06-22T00:00:02.000Z",
+      output: "ok"
+    });
+
+    await appendTestExecutionEvent(eventLogPath, intake, execution);
+
+    const [line] = (await readFile(eventLogPath, "utf8")).trim().split("\n");
+    const record = JSON.parse(line);
+    expect(record).toMatchObject({
+      actor: "dore",
+      event_type: "task_completed",
+      entity_type: "task",
+      entity_id: intake.id,
+      summary: "Engineering verification passed: pnpm test"
+    });
+    expect(record.exit_code).toBe(0);
+    expect(record.output_summary).toBe("ok");
   });
 });

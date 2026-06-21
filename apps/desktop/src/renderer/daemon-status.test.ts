@@ -50,6 +50,16 @@ describe("daemon status mapping", () => {
           shinhan: "candidate",
           samsung: "read_only_manual_reference"
         }
+      },
+      engineering: {
+        tasks: [
+          {
+            id: "intake_2026_06_22_add_daemon_task_wrapper",
+            title: "Add daemon task wrapper",
+            status: "completed",
+            last_command: "pnpm test"
+          }
+        ]
       }
     });
 
@@ -63,6 +73,7 @@ describe("daemon status mapping", () => {
     expect(dashboard.settings.providers.Claude).toBe("missing");
     expect(dashboard.settings.memory).toBe("ready");
     expect(dashboard.settings.trading).toBe("dry_run");
+    expect(dashboard.engineering.tasks[0].status).toBe("completed");
   });
 
   it("returns an offline dashboard state when daemon fetch fails", async () => {
