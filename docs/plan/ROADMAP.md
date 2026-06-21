@@ -113,7 +113,8 @@ Status:
 - Electron, Vite, and React workspace shell is in place under `apps/desktop`.
 - Dashboard renderer smoke tests cover daemon, scheduler, Telegram, and trading status sections.
 - Renderer avoids displaying token/secret detail.
-- Remaining work is daemon-connected status loading and Approvals/Logs/Settings panels.
+- Dashboard now maps daemon `/status` payloads and falls back to an offline state when the daemon cannot be reached.
+- Remaining work is Approvals/Logs/Settings panels.
 
 Deliverables:
 

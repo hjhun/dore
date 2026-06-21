@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+import { fetchDashboardStatus, mapDaemonStatusToDashboard } from "./daemon-status.js";
+
+describe("daemon status mapping", () => {
+  it("maps daemon /status payload into Dashboard state", () => {
+    const dashboard = mapDaemonStatusToDashboard({
+      app: {
+        name: "Dore",
+        mode: "local",
+        uptime_ms: 65000
+      },
+      scheduler: {
+        jobs: [
+          {
+            id: "daily_briefing_0600_kst",
+            kind: "daily_briefing",
+            time: "06:00",
+            timezone: "Asia/Seoul",
+            enabled: true
+          }
+        ]
+      },
+      telegram: {
+        configured: false,
+        allowlist_required: true,
+        adapter: {
+          state: "disabled",
+          reason: "missing_token"
+        }
+      },
+      trading: {
+        enabled: true,
+        real_trading_enabled: false,
+        brokers: {
+          toss: "candidate",
+          shinhan: "candidate",
+          samsung: "read_only_manual_reference"
+        }
+      }
+    });
+
+    expect(dashboard.daemon.mode).toBe("local");
+    expect(dashboard.daemon.uptimeLabel).toBe("1m");
+    expect(dashboard.scheduler.jobs[0].id).toBe("daily_briefing_0600_kst");
+    expect(dashboard.telegram.adapterState).toBe("disabled");
+    expect(dashboard.telegram.detail).toBe("missing_token");
+    expect(dashboard.trading.realTradingEnabled).toBe(false);
+  });
+
+  it("returns an offline dashboard state when daemon fetch fails", async () => {
+    const status = await fetchDashboardStatus({
+      baseUrl: "http://127.0.0.1:3173",
+      fetchImpl: async () => {
+        throw new Error("daemon down");
+      }
+    });
+
+    expect(status.daemon.mode).toBe("offline");
+    expect(status.scheduler.jobs).toEqual([]);
+    expect(status.telegram.adapterState).toBe("disabled");
+    expect(status.trading.realTradingEnabled).toBe(false);
+  });
+});

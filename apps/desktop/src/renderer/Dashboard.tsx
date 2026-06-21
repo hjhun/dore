@@ -72,11 +72,15 @@ export function Dashboard({ status }: { status: DashboardStatus }) {
         </StatusPanel>
 
         <StatusPanel title="Scheduler">
-          {status.scheduler.jobs.map((job) => (
-            <p key={job.id}>
-              <strong>{job.id}</strong> {job.time} {job.timezone}
-            </p>
-          ))}
+          {status.scheduler.jobs.length === 0 ? (
+            <p>No scheduled jobs</p>
+          ) : (
+            status.scheduler.jobs.map((job) => (
+              <p key={job.id}>
+                <strong>{job.id}</strong> {job.time} {job.timezone}
+              </p>
+            ))
+          )}
         </StatusPanel>
 
         <StatusPanel title="Telegram">
@@ -155,4 +159,3 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#344054"
   }
 };
-

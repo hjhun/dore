@@ -45,7 +45,8 @@ Update it whenever development state changes.
 - [x] M3 Dashboard renderer smoke tests added.
 - [x] M3 Dashboard renders daemon, scheduler, Telegram, and trading status from mocked data.
 - [x] M3 Dashboard avoids rendering token/secret detail.
-- [ ] M3 Dashboard connects to daemon status API.
+- [x] M3 Dashboard connects to daemon status API.
+- [x] M3 Dashboard handles daemon offline state.
 - [ ] M3 Approvals panel implemented.
 - [ ] M3 Logs view implemented.
 - [ ] M3 Settings status implemented.
@@ -111,7 +112,9 @@ Update it whenever development state changes.
 - [x] Renderer smoke test covers trading section.
 - [x] Renderer smoke test confirms token-like detail is not rendered.
 - [x] `pnpm build:desktop` succeeds.
-- [ ] Dashboard reads daemon status from local daemon API.
+- [x] Dashboard reads daemon status from local daemon API.
+- [x] Dashboard maps daemon `/status` payload into renderer state.
+- [x] Dashboard shows daemon offline fallback when fetch fails.
 - [ ] Approvals panel can show pending approval mock data.
 - [ ] Logs view can show action log mock data.
 - [ ] Settings status can show provider/Telegram/memory/trading setup state.
@@ -144,6 +147,8 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed.
 - 2026-06-21: M3 Electron dashboard foundation pushed to `origin/codex/add-agent-development-guide` at commit `736584a`.
+- 2026-06-21: M3 daemon status mapper and offline fallback tests added; `npx --yes pnpm@11.8.0 test` passed, 11 files and 28 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` and `npx --yes pnpm@11.8.0 build:desktop` passed after daemon-connected dashboard work.
 
 ## Known Constraints
 
@@ -154,9 +159,9 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Continue M3 daemon-connected dashboard:
+Continue M3 Dashboard panels:
 
-1. Add tests for transforming daemon `/status` payload into Dashboard state.
-2. Add renderer fetch client with graceful daemon-offline state.
-3. Add Approvals, Logs, and Settings mock panels.
+1. Add Approvals panel mock data and smoke tests.
+2. Add Logs view mock data and smoke tests.
+3. Add Settings status mock data and smoke tests.
 4. Keep Electron renderer away from raw secrets and filesystem APIs.

@@ -32,5 +32,24 @@ describe("Dashboard", () => {
     expect(screen.queryByText("token-present")).toBeNull();
     expect(screen.getByText("Configured")).toBeTruthy();
   });
-});
 
+  it("renders daemon offline state", () => {
+    render(
+      <Dashboard
+        status={{
+          ...createMockDashboardStatus(),
+          daemon: {
+            mode: "offline",
+            uptimeLabel: "n/a"
+          },
+          scheduler: {
+            jobs: []
+          }
+        }}
+      />
+    );
+
+    expect(screen.getByText("Mode: offline")).toBeTruthy();
+    expect(screen.getByText("No scheduled jobs")).toBeTruthy();
+  });
+});
