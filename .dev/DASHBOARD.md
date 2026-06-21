@@ -111,6 +111,7 @@ Update it whenever development state changes.
 - 2026-06-21: M2 scheduler and Telegram foundations pushed to `origin/codex/add-agent-development-guide` at commit `0200e9a`.
 - 2026-06-21: M2 Telegram long polling lifecycle tests added; `npx --yes pnpm@11.8.0 test` passed, 9 files and 23 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after Telegram lifecycle shell.
+- 2026-06-21: M2 Telegram polling lifecycle shell pushed to `origin/codex/add-agent-development-guide` at commit `2d67882`.
 
 ## Known Constraints
 
