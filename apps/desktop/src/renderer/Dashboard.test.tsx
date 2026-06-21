@@ -13,6 +13,13 @@ describe("Dashboard", () => {
     expect(screen.getByText("Trading")).toBeTruthy();
     expect(screen.getByText("daily_briefing_0600_kst")).toBeTruthy();
     expect(screen.getByText("Real trading disabled")).toBeTruthy();
+    expect(screen.getByText("Approvals")).toBeTruthy();
+    expect(screen.getByText("Logs")).toBeTruthy();
+    expect(screen.getByText("Settings")).toBeTruthy();
+    expect(screen.getByText("approval_demo_001")).toBeTruthy();
+    expect(screen.getByText("daemon_status_loaded")).toBeTruthy();
+    expect(screen.getByText("OpenAI: missing")).toBeTruthy();
+    expect(screen.getByText("Memory: ready")).toBeTruthy();
   });
 
   it("does not render secret values", () => {
@@ -51,5 +58,20 @@ describe("Dashboard", () => {
 
     expect(screen.getByText("Mode: offline")).toBeTruthy();
     expect(screen.getByText("No scheduled jobs")).toBeTruthy();
+  });
+
+  it("renders empty approval and log states", () => {
+    render(
+      <Dashboard
+        status={{
+          ...createMockDashboardStatus(),
+          approvals: [],
+          logs: []
+        }}
+      />
+    );
+
+    expect(screen.getByText("No pending approvals")).toBeTruthy();
+    expect(screen.getByText("No recent logs")).toBeTruthy();
   });
 });

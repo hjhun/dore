@@ -19,6 +19,23 @@ export interface DashboardStatus {
     realTradingEnabled: boolean;
     brokers: Record<string, string>;
   };
+  approvals: Array<{
+    id: string;
+    title: string;
+    riskLevel: string;
+    state: string;
+  }>;
+  logs: Array<{
+    id: string;
+    eventType: string;
+    summary: string;
+  }>;
+  settings: {
+    providers: Record<string, "configured" | "missing">;
+    telegram: "configured" | "missing";
+    memory: "ready" | "missing";
+    trading: "dry_run" | "real_enabled";
+  };
 }
 
 export function createMockDashboardStatus(): DashboardStatus {
@@ -48,6 +65,31 @@ export function createMockDashboardStatus(): DashboardStatus {
         shinhan: "candidate",
         samsung: "read_only_manual_reference"
       }
+    },
+    approvals: [
+      {
+        id: "approval_demo_001",
+        title: "Review generated plan",
+        riskLevel: "write",
+        state: "pending"
+      }
+    ],
+    logs: [
+      {
+        id: "event_demo_001",
+        eventType: "daemon_status_loaded",
+        summary: "Dashboard loaded daemon status."
+      }
+    ],
+    settings: {
+      providers: {
+        OpenAI: "missing",
+        Claude: "missing",
+        Gemini: "missing"
+      },
+      telegram: "missing",
+      memory: "ready",
+      trading: "dry_run"
     }
   };
 }
@@ -95,6 +137,44 @@ export function Dashboard({ status }: { status: DashboardStatus }) {
               {broker}: {state}
             </p>
           ))}
+        </StatusPanel>
+
+        <StatusPanel title="Approvals">
+          {status.approvals.length === 0 ? (
+            <p>No pending approvals</p>
+          ) : (
+            status.approvals.map((approval) => (
+              <div key={approval.id} style={styles.stack}>
+                <p>{approval.id}</p>
+                <p>{approval.title}</p>
+                <p>
+                  {approval.riskLevel}: {approval.state}
+                </p>
+              </div>
+            ))
+          )}
+        </StatusPanel>
+
+        <StatusPanel title="Logs">
+          {status.logs.length === 0 ? (
+            <p>No recent logs</p>
+          ) : (
+            status.logs.map((log) => (
+              <div key={log.id} style={styles.stack}>
+                <p>{log.eventType}</p>
+                <p>{log.summary}</p>
+              </div>
+            ))
+          )}
+        </StatusPanel>
+
+        <StatusPanel title="Settings">
+          {Object.entries(status.settings.providers).map(([provider, state]) => (
+            <p key={provider}>{`${provider}: ${state}`}</p>
+          ))}
+          <p>{`Telegram: ${status.settings.telegram}`}</p>
+          <p>{`Memory: ${status.settings.memory}`}</p>
+          <p>{`Trading: ${status.settings.trading}`}</p>
         </StatusPanel>
       </section>
     </main>
@@ -157,5 +237,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "8px",
     fontSize: "14px",
     color: "#344054"
+  },
+  stack: {
+    display: "grid",
+    gap: "4px"
   }
 };

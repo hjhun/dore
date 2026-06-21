@@ -114,7 +114,8 @@ Status:
 - Dashboard renderer smoke tests cover daemon, scheduler, Telegram, and trading status sections.
 - Renderer avoids displaying token/secret detail.
 - Dashboard now maps daemon `/status` payloads and falls back to an offline state when the daemon cannot be reached.
-- Remaining work is Approvals/Logs/Settings panels.
+- Approvals, Logs, and Settings panels render safe mock/default state.
+- Remaining work is approval approve/reject interaction and decision logging.
 
 Deliverables:
 

@@ -24,6 +24,20 @@ export interface DaemonStatusPayload {
       mode?: string;
     };
   };
+  providers?: {
+    openai?: {
+      configured: boolean;
+    };
+    claude?: {
+      configured: boolean;
+    };
+    gemini?: {
+      configured: boolean;
+    };
+  };
+  memory?: {
+    ready: boolean;
+  };
   trading: {
     enabled: boolean;
     real_trading_enabled: boolean;
@@ -58,6 +72,18 @@ export function mapDaemonStatusToDashboard(payload: DaemonStatusPayload): Dashbo
     trading: {
       realTradingEnabled: payload.trading.real_trading_enabled,
       brokers: payload.trading.brokers
+    },
+    approvals: [],
+    logs: [],
+    settings: {
+      providers: {
+        OpenAI: providerState(payload.providers?.openai?.configured),
+        Claude: providerState(payload.providers?.claude?.configured),
+        Gemini: providerState(payload.providers?.gemini?.configured)
+      },
+      telegram: payload.telegram?.configured ? "configured" : "missing",
+      memory: payload.memory?.ready ? "ready" : "missing",
+      trading: payload.trading.real_trading_enabled ? "real_enabled" : "dry_run"
     }
   };
 }
@@ -97,8 +123,24 @@ export function createOfflineDashboardStatus(): DashboardStatus {
         shinhan: "unknown",
         samsung: "unknown"
       }
+    },
+    approvals: [],
+    logs: [],
+    settings: {
+      providers: {
+        OpenAI: "missing",
+        Claude: "missing",
+        Gemini: "missing"
+      },
+      telegram: "missing",
+      memory: "missing",
+      trading: "dry_run"
     }
   };
+}
+
+function providerState(configured: boolean | undefined): "configured" | "missing" {
+  return configured ? "configured" : "missing";
 }
 
 function formatUptime(milliseconds: number): string {
@@ -107,4 +149,3 @@ function formatUptime(milliseconds: number): string {
   }
   return `${Math.floor(milliseconds / 60_000)}m`;
 }
-

@@ -28,6 +28,20 @@ describe("daemon status mapping", () => {
           reason: "missing_token"
         }
       },
+      providers: {
+        openai: {
+          configured: true
+        },
+        claude: {
+          configured: false
+        },
+        gemini: {
+          configured: false
+        }
+      },
+      memory: {
+        ready: true
+      },
       trading: {
         enabled: true,
         real_trading_enabled: false,
@@ -45,6 +59,10 @@ describe("daemon status mapping", () => {
     expect(dashboard.telegram.adapterState).toBe("disabled");
     expect(dashboard.telegram.detail).toBe("missing_token");
     expect(dashboard.trading.realTradingEnabled).toBe(false);
+    expect(dashboard.settings.providers.OpenAI).toBe("configured");
+    expect(dashboard.settings.providers.Claude).toBe("missing");
+    expect(dashboard.settings.memory).toBe("ready");
+    expect(dashboard.settings.trading).toBe("dry_run");
   });
 
   it("returns an offline dashboard state when daemon fetch fails", async () => {

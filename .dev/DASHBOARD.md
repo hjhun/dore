@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M3, Electron Dashboard MVP
-- Current task: extend Electron Dashboard foundation into daemon-connected UI panels
+- Current task: add interactive approval decisions to the Electron Dashboard panels
 
 ## Milestone Progress
 
@@ -47,9 +47,9 @@ Update it whenever development state changes.
 - [x] M3 Dashboard avoids rendering token/secret detail.
 - [x] M3 Dashboard connects to daemon status API.
 - [x] M3 Dashboard handles daemon offline state.
-- [ ] M3 Approvals panel implemented.
-- [ ] M3 Logs view implemented.
-- [ ] M3 Settings status implemented.
+- [x] M3 Approvals panel implemented.
+- [x] M3 Logs view implemented.
+- [x] M3 Settings status implemented.
 - [ ] M3 branch pushed.
 
 ## M0 Checklist
@@ -115,9 +115,10 @@ Update it whenever development state changes.
 - [x] Dashboard reads daemon status from local daemon API.
 - [x] Dashboard maps daemon `/status` payload into renderer state.
 - [x] Dashboard shows daemon offline fallback when fetch fails.
-- [ ] Approvals panel can show pending approval mock data.
-- [ ] Logs view can show action log mock data.
-- [ ] Settings status can show provider/Telegram/memory/trading setup state.
+- [x] Approvals panel can show pending approval mock data.
+- [x] Logs view can show action log mock data.
+- [x] Settings status can show provider/Telegram/memory/trading setup state.
+- [ ] Pending approvals can be approved or rejected.
 
 ## Verification Log
 
@@ -150,6 +151,10 @@ Update it whenever development state changes.
 - 2026-06-21: M3 daemon status mapper and offline fallback tests added; `npx --yes pnpm@11.8.0 test` passed, 11 files and 28 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` and `npx --yes pnpm@11.8.0 build:desktop` passed after daemon-connected dashboard work.
 - 2026-06-21: M3 daemon-connected dashboard pushed to `origin/codex/add-agent-development-guide` at commit `6cce905`.
+- 2026-06-21: M3 Approvals, Logs, and Settings panel tests added; TDD red phase confirmed for missing panels.
+- 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 11 files and 29 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed.
 
 ## Known Constraints
 
@@ -160,9 +165,8 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Continue M3 Dashboard panels:
+Continue M3 Dashboard approvals:
 
-1. Add Approvals panel mock data and smoke tests.
-2. Add Logs view mock data and smoke tests.
-3. Add Settings status mock data and smoke tests.
-4. Keep Electron renderer away from raw secrets and filesystem APIs.
+1. Add approve/reject interactions for pending approvals.
+2. Log approval decisions without raw secret detail.
+3. Keep Electron renderer away from raw secrets and filesystem APIs.
