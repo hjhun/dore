@@ -12,6 +12,7 @@ import {
   createWatchlistStore,
   ensureRealTradingBlocked,
   loadWatchlistStore,
+  createRealTradingGateStatus,
   runRiskCheck,
   saveWatchlistStore,
   summarizeDryRunJournal
@@ -344,5 +345,69 @@ describe("trading watch and dry-run foundations", () => {
         enabled: false
       }
     ]);
+  });
+
+  it("keeps pilot real trading blocked until every M6 gate passes", () => {
+    const gate = createRealTradingGateStatus({
+      realTradingRequested: true,
+      explicitEnable: true,
+      officialApiVerified: false,
+      termsVerified: false,
+      brokerCredentialRefs: {},
+      dryRunObservedDays: 0,
+      dryRunMinDays: 30,
+      killSwitchEnabled: true,
+      approvalRequired: true,
+      approvalGranted: false,
+      riskLimits: {}
+    });
+    const status = createTradingStatus({
+      realTradingEnabled: gate.status === "ready",
+      realTradingGate: gate
+    });
+
+    expect(gate.status).toBe("blocked");
+    expect(gate.blocked_reasons).toEqual([
+      "Official broker API is not verified.",
+      "Broker API terms are not verified.",
+      "Broker credential secret references are missing.",
+      "Dry-run history is shorter than the required minimum.",
+      "Trading kill switch is enabled.",
+      "User approval is required for pilot real trading.",
+      "Pilot risk limits are incomplete."
+    ]);
+    expect(status.real_trading_enabled).toBe(false);
+    expect(status.blocked_actions).toContain("Official broker API is not verified.");
+  });
+
+  it("marks pilot real trading gates ready only with explicit config and references", () => {
+    const gate = createRealTradingGateStatus({
+      realTradingRequested: true,
+      explicitEnable: true,
+      officialApiVerified: true,
+      termsVerified: true,
+      brokerCredentialRefs: {
+        toss: {
+          app_key_secret_ref: "secret_ref:brokers/toss/app_key",
+          app_secret_secret_ref: "secret_ref:brokers/toss/app_secret",
+          account_secret_ref: "secret_ref:brokers/toss/account"
+        }
+      },
+      dryRunObservedDays: 30,
+      dryRunMinDays: 30,
+      killSwitchEnabled: false,
+      approvalRequired: true,
+      approvalGranted: true,
+      riskLimits: {
+        max_order_krw_equivalent: 100_000,
+        max_daily_new_buy_krw_equivalent: 300_000,
+        max_daily_loss_krw_equivalent: 100_000,
+        max_position_pct: 10
+      }
+    });
+
+    expect(gate.status).toBe("ready");
+    expect(gate.blocked_reasons).toEqual([]);
+    expect(gate.checks.every((check) => check.status === "pass")).toBe(true);
   });
 });

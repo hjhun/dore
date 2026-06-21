@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
+import type { DoreConfig } from "../../../packages/config/src/index.js";
 import type { ExecFileResult, FileEditRecord, PackageJsonLike, ProjectIntake } from "../../../packages/engineering/src/index.js";
 import {
   appendFileEditEvent,
@@ -15,6 +16,7 @@ import { createTelegramAdapterStatus } from "../../../packages/telegram/src/inde
 import {
   appendDryRunJournalEntry,
   createDryRunJournalEntry,
+  createRealTradingGateStatus,
   createTradingSignal,
   createTradingStatus,
   ensureRealTradingBlocked,
@@ -32,6 +34,7 @@ export interface DaemonAppOptions {
   memoryReady?: boolean;
   memoryRoot?: string;
   projectRoot?: string;
+  tradingConfig?: DoreConfig["trading"];
   packageJson?: PackageJsonLike;
   engineeringExecFile?: (command: string, args: string[]) => Promise<ExecFileResult>;
   engineeringCommandExecFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
@@ -109,7 +112,7 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       scheduler: {
         jobs: scheduler.list()
       },
-      trading: await createLocalTradingStatus(memoryRoot, startedAt),
+      trading: await createLocalTradingStatus(memoryRoot, startedAt, options.tradingConfig),
       engineering: {
         tasks: Array.from(engineeringTasks.values()).map((task) => ({
           id: task.intake.id,
@@ -121,7 +124,7 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
     };
   });
 
-  app.get("/trading/status", async () => createLocalTradingStatus(memoryRoot, startedAt));
+  app.get("/trading/status", async () => createLocalTradingStatus(memoryRoot, startedAt, options.tradingConfig));
 
   app.post("/trading/signals/dry-run", async (request, reply) => {
     const payload = request.body as Record<string, unknown> | null;
@@ -371,13 +374,29 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
   return app;
 }
 
-async function createLocalTradingStatus(memoryRoot: string, now: Date) {
+async function createLocalTradingStatus(memoryRoot: string, now: Date, tradingConfig?: DoreConfig["trading"]) {
   const month = now.toISOString().slice(0, 7);
   const watchlist = await loadWatchlistStore(memoryRoot);
+  const gateConfig = tradingConfig?.real_trading_gates;
+  const realTradingGate = createRealTradingGateStatus({
+    realTradingRequested: tradingConfig?.real_trading_enabled ?? false,
+    explicitEnable: gateConfig?.explicit_enable ?? false,
+    officialApiVerified: gateConfig?.official_api_verified ?? false,
+    termsVerified: gateConfig?.terms_verified ?? false,
+    brokerCredentialRefs: gateConfig?.broker_credentials,
+    dryRunObservedDays: gateConfig?.dry_run_observed_days ?? 0,
+    dryRunMinDays: gateConfig?.dry_run_min_days ?? 30,
+    killSwitchEnabled: gateConfig?.kill_switch_enabled ?? true,
+    approvalRequired: gateConfig?.approval_required ?? true,
+    approvalGranted: gateConfig?.approval_granted ?? false,
+    riskLimits: gateConfig?.risk_limits
+  });
   return createTradingStatus({
-    realTradingEnabled: false,
+    realTradingEnabled: realTradingGate.status === "ready",
+    brokers: tradingConfig?.brokers,
     watchlist: watchlist.items,
-    dryRunJournal: await summarizeDryRunJournal(memoryRoot, month)
+    dryRunJournal: await summarizeDryRunJournal(memoryRoot, month),
+    realTradingGate
   });
 }
 

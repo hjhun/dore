@@ -227,9 +227,11 @@ Goal:
 
 Status:
 
-- Not started.
+- Real-trading gate scaffolding is implemented in config, trading status, daemon status, and desktop status.
+- Broker credential fields accept only `secret_ref:` references.
+- Gate checks cover explicit enablement, official API verification, terms verification, broker credential references, dry-run history, kill switch, approval, and risk limits.
 - Official broker API and terms are still pending user input.
-- The next safe slice is config and gate scaffolding while keeping real trading disabled by default.
+- The next safe slice is approval and kill-switch controls without enabling real orders.
 
 Prerequisites:
 

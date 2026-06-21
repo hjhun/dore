@@ -13,6 +13,8 @@ describe("Dashboard", () => {
     expect(screen.getByText("Trading")).toBeTruthy();
     expect(screen.getByText("daily_briefing_0600_kst")).toBeTruthy();
     expect(screen.getByText("Real trading disabled")).toBeTruthy();
+    expect(screen.getByText("Real gate: blocked")).toBeTruthy();
+    expect(screen.getByText("Gate blocked: Trading kill switch is enabled.")).toBeTruthy();
     expect(screen.getByText("Dry-run entries: 0")).toBeTruthy();
     expect(screen.getByText("Approvals")).toBeTruthy();
     expect(screen.getByText("Logs")).toBeTruthy();

@@ -2,6 +2,7 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parseConfig } from "../../../packages/config/src/index.js";
 import {
   appendDryRunJournalEntry,
   createDryRunJournalEntry,
@@ -246,5 +247,45 @@ describe("daemon status", () => {
     expect(response.json()).toEqual({
       error: "real_trading_disabled"
     });
+  });
+
+  it("exposes blocked pilot real trading gates without enabling real trading", async () => {
+    const app = createDaemonApp({
+      tradingConfig: parseConfig({
+        trading: {
+          real_trading_enabled: true,
+          real_trading_gates: {
+            explicit_enable: true,
+            official_api_verified: false,
+            terms_verified: false,
+            broker_credentials: {},
+            dry_run_min_days: 30,
+            dry_run_observed_days: 0,
+            kill_switch_enabled: true,
+            approval_required: true,
+            approval_granted: false,
+            risk_limits: {}
+          }
+        }
+      }).trading
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/trading/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.real_trading_enabled).toBe(false);
+    expect(body.real_trading_gate).toMatchObject({
+      enabled_requested: true,
+      status: "blocked",
+      blocked_reasons: expect.arrayContaining([
+        "Official broker API is not verified.",
+        "Trading kill switch is enabled."
+      ])
+    });
+    expect(body.blocked_actions).toContain("Trading kill switch is enabled.");
   });
 });

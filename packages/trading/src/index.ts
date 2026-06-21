@@ -20,6 +20,47 @@ export interface BrokerConfig {
 
 export type BrokerConfigMap = Partial<Record<BrokerId, BrokerConfig>>;
 
+export interface BrokerCredentialRefs {
+  app_key_secret_ref?: string;
+  app_secret_secret_ref?: string;
+  account_secret_ref?: string;
+}
+
+export interface PilotRiskLimits {
+  max_order_krw_equivalent?: number;
+  max_daily_new_buy_krw_equivalent?: number;
+  max_daily_loss_krw_equivalent?: number;
+  max_position_pct?: number;
+}
+
+export interface CreateRealTradingGateStatusInput {
+  realTradingRequested: boolean;
+  explicitEnable: boolean;
+  officialApiVerified: boolean;
+  termsVerified: boolean;
+  brokerCredentialRefs?: Partial<Record<BrokerId, BrokerCredentialRefs>>;
+  dryRunObservedDays: number;
+  dryRunMinDays: number;
+  killSwitchEnabled: boolean;
+  approvalRequired: boolean;
+  approvalGranted: boolean;
+  riskLimits?: PilotRiskLimits;
+}
+
+export interface RealTradingGateCheck {
+  id: string;
+  status: "pass" | "blocked";
+  required: boolean;
+  reason: string;
+}
+
+export interface RealTradingGateStatus {
+  enabled_requested: boolean;
+  status: "ready" | "blocked";
+  checks: RealTradingGateCheck[];
+  blocked_reasons: string[];
+}
+
 export interface WatchlistInput {
   market: Market;
   symbol: string;
@@ -49,6 +90,7 @@ export interface CreateTradingStatusInput {
   brokers?: BrokerConfigMap;
   watchlist?: WatchlistInput[];
   dryRunJournal?: DryRunJournalSummary;
+  realTradingGate?: RealTradingGateStatus;
 }
 
 export interface TradingStatus {
@@ -62,6 +104,7 @@ export interface TradingStatus {
   };
   blocked_actions: string[];
   dry_run_journal?: DryRunJournalSummary;
+  real_trading_gate?: RealTradingGateStatus;
 }
 
 export interface RiskPolicy {
@@ -238,6 +281,10 @@ export function ensureRealTradingBlocked(input: {
 export function createTradingStatus(input: CreateTradingStatusInput): TradingStatus {
   const brokerCapabilities = createBrokerCapabilityRegistry(input.brokers);
   const watchlist = createWatchlistStore(input.watchlist);
+  const blockedActions = input.realTradingEnabled ? [] : ["Real trading disabled."];
+  if (input.realTradingGate?.status === "blocked") {
+    blockedActions.push(...input.realTradingGate.blocked_reasons);
+  }
 
   return {
     enabled: true,
@@ -251,8 +298,61 @@ export function createTradingStatus(input: CreateTradingStatusInput): TradingSta
       count: watchlist.items.length,
       items: watchlist.items
     },
-    blocked_actions: input.realTradingEnabled ? [] : ["Real trading disabled."],
-    dry_run_journal: input.dryRunJournal
+    blocked_actions: Array.from(new Set(blockedActions)),
+    dry_run_journal: input.dryRunJournal,
+    real_trading_gate: input.realTradingGate
+  };
+}
+
+export function createRealTradingGateStatus(input: CreateRealTradingGateStatusInput): RealTradingGateStatus {
+  const checks: RealTradingGateCheck[] = [
+    createGateCheck({
+      id: "explicit_enable",
+      passes: input.realTradingRequested && input.explicitEnable,
+      reason: "Explicit real trading config is not enabled."
+    }),
+    createGateCheck({
+      id: "official_api_verified",
+      passes: input.officialApiVerified,
+      reason: "Official broker API is not verified."
+    }),
+    createGateCheck({
+      id: "terms_verified",
+      passes: input.termsVerified,
+      reason: "Broker API terms are not verified."
+    }),
+    createGateCheck({
+      id: "broker_credentials",
+      passes: hasCompleteBrokerCredentialRefs(input.brokerCredentialRefs),
+      reason: "Broker credential secret references are missing."
+    }),
+    createGateCheck({
+      id: "dry_run_history",
+      passes: input.dryRunObservedDays >= input.dryRunMinDays,
+      reason: "Dry-run history is shorter than the required minimum."
+    }),
+    createGateCheck({
+      id: "kill_switch",
+      passes: !input.killSwitchEnabled,
+      reason: "Trading kill switch is enabled."
+    }),
+    createGateCheck({
+      id: "approval",
+      passes: !input.approvalRequired || input.approvalGranted,
+      reason: "User approval is required for pilot real trading."
+    }),
+    createGateCheck({
+      id: "risk_limits",
+      passes: hasCompletePilotRiskLimits(input.riskLimits),
+      reason: "Pilot risk limits are incomplete."
+    })
+  ];
+  const blockedReasons = checks.filter((check) => check.status === "blocked").map((check) => check.reason);
+  return {
+    enabled_requested: input.realTradingRequested,
+    status: blockedReasons.length === 0 ? "ready" : "blocked",
+    checks,
+    blocked_reasons: blockedReasons
   };
 }
 
@@ -405,6 +505,31 @@ function mergeBrokerConfigs(configs: BrokerConfigMap): Record<BrokerId, BrokerCo
       ...configs.samsung
     }
   };
+}
+
+function createGateCheck(input: { id: string; passes: boolean; reason: string }): RealTradingGateCheck {
+  return {
+    id: input.id,
+    status: input.passes ? "pass" : "blocked",
+    required: true,
+    reason: input.reason
+  };
+}
+
+function hasCompleteBrokerCredentialRefs(refs: Partial<Record<BrokerId, BrokerCredentialRefs>> = {}): boolean {
+  return BROKER_ORDER.some((broker) => {
+    const ref = refs[broker];
+    return Boolean(ref?.app_key_secret_ref && ref.app_secret_secret_ref && ref.account_secret_ref);
+  });
+}
+
+function hasCompletePilotRiskLimits(limits: PilotRiskLimits = {}): boolean {
+  return Boolean(
+    limits.max_order_krw_equivalent
+      && limits.max_daily_new_buy_krw_equivalent
+      && limits.max_daily_loss_krw_equivalent
+      && limits.max_position_pct
+  );
 }
 
 function watchlistPath(memoryRoot: string): string {

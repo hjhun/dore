@@ -28,6 +28,11 @@ export interface DashboardStatus {
       blocked: number;
       latestSignalId?: string;
     };
+    realTradingGate?: {
+      enabledRequested: boolean;
+      status: "ready" | "blocked";
+      blockedReasons: string[];
+    };
   };
   approvals: Array<{
     id: string;
@@ -85,6 +90,11 @@ export function createMockDashboardStatus(): DashboardStatus {
         entries: 0,
         passed: 0,
         blocked: 0
+      },
+      realTradingGate: {
+        enabledRequested: false,
+        status: "blocked",
+        blockedReasons: ["Trading kill switch is enabled."]
       },
       brokers: {
         toss: "candidate",
@@ -187,6 +197,10 @@ export function Dashboard({ status }: { status: DashboardStatus }) {
 
         <StatusPanel title="Trading">
           <p>{tradingState}</p>
+          {status.trading.realTradingGate ? <p>Real gate: {status.trading.realTradingGate.status}</p> : null}
+          {status.trading.realTradingGate?.blockedReasons[0] ? (
+            <p>Gate blocked: {status.trading.realTradingGate.blockedReasons[0]}</p>
+          ) : null}
           <p>Dry-run entries: {status.trading.dryRunJournal?.entries ?? 0}</p>
           {status.trading.dryRunJournal ? (
             <p>

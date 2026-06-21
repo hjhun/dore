@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M6, Pilot Real Trading Preparation
-- Current task: M5 accepted; next is M6 real-trading gate scaffolding
+- Current task: M6 real-trading gate scaffolding implemented; next is approval/kill-switch controls
 
 ## Milestone Progress
 
@@ -91,11 +91,11 @@ Update it whenever development state changes.
 - [x] M5 manual dry-run trading signal route implemented.
 - [x] M5 manual dry-run route rejects real execution mode.
 - [x] M5 acceptance audit documented.
-- [ ] M6 real trading remains disabled by default in config gates.
-- [ ] M6 broker credential references can be configured without raw secrets.
-- [ ] M6 kill switch gate is represented in status.
-- [ ] M6 approval gate is represented before real execution.
-- [ ] M6 risk limit gate is represented before real execution.
+- [x] M6 real trading remains disabled by default in config gates.
+- [x] M6 broker credential references can be configured without raw secrets.
+- [x] M6 kill switch gate is represented in daemon and desktop status.
+- [x] M6 approval gate is represented before real execution.
+- [x] M6 risk limit gate is represented before real execution.
 
 ## M0 Checklist
 
@@ -213,12 +213,12 @@ Update it whenever development state changes.
 
 ## M6 Checklist
 
-- [ ] Real trading remains disabled by default.
-- [ ] Enabling real trading requires explicit config.
-- [ ] Broker credentials are represented only through secret references.
-- [ ] Kill switch gate is visible and defaults to blocking.
-- [ ] Approval gate is required before any future real execution.
-- [ ] Risk limit gate is required before any future real execution.
+- [x] Real trading remains disabled by default.
+- [x] Enabling real trading requires explicit config.
+- [x] Broker credentials are represented only through secret references.
+- [x] Kill switch gate is visible and defaults to blocking.
+- [x] Approval gate is required before any future real execution.
+- [x] Risk limit gate is required before any future real execution.
 - [ ] Missing official broker API details keep all real order paths blocked.
 
 ## Verification Log
@@ -354,6 +354,12 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 acceptance audit.
 - 2026-06-22: Docs relative link check passed after M5 acceptance audit docs update.
 - 2026-06-22: Changed-file secret-like scan found no plaintext secret values after M5 acceptance audit.
+- 2026-06-22: M6 gate scaffolding TDD red phase confirmed for missing config gates, gate evaluator, and daemon status.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M6 gate scaffolding, 15 files and 85 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M6 gate scaffolding.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M6 gate scaffolding.
+- 2026-06-22: Docs relative link check passed after M6 gate scaffolding docs update.
+- 2026-06-22: Changed-file secret-like scan found no plaintext secret values after M6 gate scaffolding.
 
 ## Known Constraints
 
@@ -366,5 +372,5 @@ Update it whenever development state changes.
 
 Continue M6 Pilot Real Trading Preparation:
 
-1. Start M6 real-trading gate scaffolding.
+1. Add approval and kill-switch control routes without enabling real orders.
 2. Keep all real broker/order paths blocked until user supplies official API details.

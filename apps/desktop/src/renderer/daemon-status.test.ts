@@ -52,6 +52,11 @@ describe("daemon status mapping", () => {
           blocked: 1,
           latest_signal_id: "signal_20260622_AAPL_status"
         },
+        real_trading_gate: {
+          enabled_requested: true,
+          status: "blocked",
+          blocked_reasons: ["Trading kill switch is enabled."]
+        },
         brokers: {
           toss: "candidate",
           shinhan: "candidate",
@@ -82,6 +87,11 @@ describe("daemon status mapping", () => {
       passed: 1,
       blocked: 1,
       latestSignalId: "signal_20260622_AAPL_status"
+    });
+    expect(dashboard.trading.realTradingGate).toEqual({
+      enabledRequested: true,
+      status: "blocked",
+      blockedReasons: ["Trading kill switch is enabled."]
     });
     expect(dashboard.settings.providers.OpenAI).toBe("configured");
     expect(dashboard.settings.providers.Claude).toBe("missing");

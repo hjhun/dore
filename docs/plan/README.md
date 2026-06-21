@@ -13,12 +13,11 @@ Use this plan as the day-to-day development source of truth. The draft documents
 
 ## Current Development Focus
 
-Current focus: Milestone 6, pilot real trading preparation gates.
+Current focus: Milestone 6, pilot real trading approval and kill-switch controls.
 
 The next working slice must provide:
 
-- real trading still disabled by default.
-- explicit config gates for future pilot real trading.
-- secret reference checks without storing raw broker credentials.
-- kill switch, approval, and risk limit gate surfaces.
-- tests proving missing broker/API details keep all real paths blocked.
+- approval and kill-switch control routes.
+- persisted audit events for any gate state changes.
+- tests proving these controls do not create real order paths.
+- daemon and desktop status visibility for blocked gate state.

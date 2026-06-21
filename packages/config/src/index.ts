@@ -8,6 +8,46 @@ const BrokerConfigSchema = z.object({
   mode: z.enum(["candidate", "read_only_manual_reference", "paper", "real"]).default("candidate")
 });
 
+const SecretRefSchema = z.string().refine((value) => value.startsWith("secret_ref:"), {
+  message: "Broker credential values must be secret_ref references."
+});
+
+const BrokerCredentialRefSchema = z.object({
+  app_key_secret_ref: SecretRefSchema.optional(),
+  app_secret_secret_ref: SecretRefSchema.optional(),
+  account_secret_ref: SecretRefSchema.optional()
+});
+
+const RiskLimitGateSchema = z
+  .object({
+    max_order_krw_equivalent: z.number().positive().optional(),
+    max_daily_new_buy_krw_equivalent: z.number().positive().optional(),
+    max_daily_loss_krw_equivalent: z.number().positive().optional(),
+    max_position_pct: z.number().positive().optional()
+  })
+  .default({});
+
+const RealTradingGateSchema = z
+  .object({
+    explicit_enable: z.boolean().default(false),
+    official_api_verified: z.boolean().default(false),
+    terms_verified: z.boolean().default(false),
+    broker_credentials: z
+      .object({
+        toss: BrokerCredentialRefSchema.optional(),
+        shinhan: BrokerCredentialRefSchema.optional(),
+        samsung: BrokerCredentialRefSchema.optional()
+      })
+      .default({}),
+    dry_run_min_days: z.number().int().nonnegative().default(30),
+    dry_run_observed_days: z.number().int().nonnegative().default(0),
+    kill_switch_enabled: z.boolean().default(true),
+    approval_required: z.boolean().default(true),
+    approval_granted: z.boolean().default(false),
+    risk_limits: RiskLimitGateSchema
+  })
+  .default({});
+
 export const DoreConfigSchema = z.object({
   app: z
     .object({
@@ -49,7 +89,8 @@ export const DoreConfigSchema = z.object({
             mode: "read_only_manual_reference"
           })
         })
-        .default({})
+        .default({}),
+      real_trading_gates: RealTradingGateSchema
     })
     .default({})
 });
@@ -64,4 +105,3 @@ export async function loadConfig(path: string): Promise<DoreConfig> {
   const raw = await readFile(path, "utf8");
   return parseConfig(YAML.parse(raw));
 }
-

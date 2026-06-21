@@ -49,6 +49,11 @@ export interface DaemonStatusPayload {
       blocked: number;
       latest_signal_id?: string;
     };
+    real_trading_gate?: {
+      enabled_requested: boolean;
+      status: "ready" | "blocked";
+      blocked_reasons: string[];
+    };
   };
   engineering?: {
     tasks: Array<{
@@ -94,6 +99,13 @@ export function mapDaemonStatusToDashboard(payload: DaemonStatusPayload): Dashbo
             passed: payload.trading.dry_run_journal.passed,
             blocked: payload.trading.dry_run_journal.blocked,
             latestSignalId: payload.trading.dry_run_journal.latest_signal_id
+          }
+        : undefined,
+      realTradingGate: payload.trading.real_trading_gate
+        ? {
+            enabledRequested: payload.trading.real_trading_gate.enabled_requested,
+            status: payload.trading.real_trading_gate.status,
+            blockedReasons: payload.trading.real_trading_gate.blocked_reasons
           }
         : undefined
     },
@@ -156,6 +168,11 @@ export function createOfflineDashboardStatus(): DashboardStatus {
         entries: 0,
         passed: 0,
         blocked: 0
+      },
+      realTradingGate: {
+        enabledRequested: false,
+        status: "blocked",
+        blockedReasons: ["daemon_offline"]
       },
       brokers: {
         toss: "unknown",

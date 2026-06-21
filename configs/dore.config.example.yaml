@@ -32,4 +32,22 @@ trading:
       enabled: true
       priority: 3
       mode: read_only_manual_reference
-
+  real_trading_gates:
+    explicit_enable: false
+    official_api_verified: false
+    terms_verified: false
+    broker_credentials:
+      toss:
+        app_key_secret_ref: secret_ref:brokers/toss/app_key
+        app_secret_secret_ref: secret_ref:brokers/toss/app_secret
+        account_secret_ref: secret_ref:brokers/toss/account
+    dry_run_min_days: 30
+    dry_run_observed_days: 0
+    kill_switch_enabled: true
+    approval_required: true
+    approval_granted: false
+    risk_limits:
+      max_order_krw_equivalent: 100000
+      max_daily_new_buy_krw_equivalent: 300000
+      max_daily_loss_krw_equivalent: 100000
+      max_position_pct: 10
