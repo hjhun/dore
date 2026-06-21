@@ -108,6 +108,13 @@ Goal:
 
 - Provide the primary local UI for Dore.
 
+Status:
+
+- Electron, Vite, and React workspace shell is in place under `apps/desktop`.
+- Dashboard renderer smoke tests cover daemon, scheduler, Telegram, and trading status sections.
+- Renderer avoids displaying token/secret detail.
+- Remaining work is daemon-connected status loading and Approvals/Logs/Settings panels.
+
 Deliverables:
 
 - Electron + React + Vite app.

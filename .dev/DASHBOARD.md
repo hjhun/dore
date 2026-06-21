@@ -8,8 +8,8 @@ Update it whenever development state changes.
 
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
-- Active milestone: M2, Scheduler and Telegram MVP
-- Current task: extend M2 from pure scheduler/Telegram command foundation to daemon integration
+- Active milestone: M3, Electron Dashboard MVP
+- Current task: extend Electron Dashboard foundation into daemon-connected UI panels
 
 ## Milestone Progress
 
@@ -41,6 +41,15 @@ Update it whenever development state changes.
 - [x] M2 Telegram adapter safety status implemented.
 - [x] M2 Telegram long polling adapter lifecycle implemented.
 - [x] M2 branch pushed.
+- [x] M3 Electron/Vite/React workspace shell added.
+- [x] M3 Dashboard renderer smoke tests added.
+- [x] M3 Dashboard renders daemon, scheduler, Telegram, and trading status from mocked data.
+- [x] M3 Dashboard avoids rendering token/secret detail.
+- [ ] M3 Dashboard connects to daemon status API.
+- [ ] M3 Approvals panel implemented.
+- [ ] M3 Logs view implemented.
+- [ ] M3 Settings status implemented.
+- [ ] M3 branch pushed.
 
 ## M0 Checklist
 
@@ -89,6 +98,24 @@ Update it whenever development state changes.
 - [x] Telegram adapter is disabled without token or allowlist.
 - [x] Telegram long polling lifecycle shell is wired without real network calls.
 
+## M3 Checklist
+
+- [x] `apps/desktop` exists.
+- [x] Electron main process skeleton exists.
+- [x] Electron preload exposes only a narrow `dore` object.
+- [x] Vite renderer shell exists.
+- [x] React Dashboard component exists.
+- [x] Renderer smoke test covers daemon section.
+- [x] Renderer smoke test covers scheduler section.
+- [x] Renderer smoke test covers Telegram section.
+- [x] Renderer smoke test covers trading section.
+- [x] Renderer smoke test confirms token-like detail is not rendered.
+- [x] `pnpm build:desktop` succeeds.
+- [ ] Dashboard reads daemon status from local daemon API.
+- [ ] Approvals panel can show pending approval mock data.
+- [ ] Logs view can show action log mock data.
+- [ ] Settings status can show provider/Telegram/memory/trading setup state.
+
 ## Verification Log
 
 - 2026-06-21: Docs relative link check passed before plan work.
@@ -112,6 +139,10 @@ Update it whenever development state changes.
 - 2026-06-21: M2 Telegram long polling lifecycle tests added; `npx --yes pnpm@11.8.0 test` passed, 9 files and 23 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after Telegram lifecycle shell.
 - 2026-06-21: M2 Telegram polling lifecycle shell pushed to `origin/codex/add-agent-development-guide` at commit `2d67882`.
+- 2026-06-21: M3 Dashboard TDD red phase confirmed when TSX tests were not included, then missing `Dashboard.tsx` failed correctly after Vitest include fix.
+- 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 10 files and 25 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed.
 
 ## Known Constraints
 
@@ -122,9 +153,9 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Start M3 Electron Dashboard foundation:
+Continue M3 daemon-connected dashboard:
 
-1. Add minimal Electron/Vite workspace shell.
-2. Add renderer smoke tests for Dashboard status sections.
-3. Keep Electron renderer away from secrets/filesystem.
-4. Show daemon, scheduler, Telegram, and trading status from mocked data first.
+1. Add tests for transforming daemon `/status` payload into Dashboard state.
+2. Add renderer fetch client with graceful daemon-offline state.
+3. Add Approvals, Logs, and Settings mock panels.
+4. Keep Electron renderer away from raw secrets and filesystem APIs.
