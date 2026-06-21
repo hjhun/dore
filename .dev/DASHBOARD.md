@@ -229,6 +229,7 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 14 files and 50 tests.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 engineering task history persistence.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 engineering task history persistence.
+- 2026-06-22: M4 engineering task history persistence pushed to `origin/codex/add-agent-development-guide` at commit `c02495c`.
 
 ## Known Constraints
 
