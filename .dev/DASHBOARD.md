@@ -320,6 +320,7 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 watchlist persistence work.
 - 2026-06-22: Docs relative link check passed after M5 watchlist persistence docs update.
 - 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
+- 2026-06-22: M5 watchlist persistence pushed to `origin/codex/add-agent-development-guide` at commit `7674909`.
 
 ## Known Constraints
 
