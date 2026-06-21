@@ -61,6 +61,18 @@ export interface RealTradingGateStatus {
   blocked_reasons: string[];
 }
 
+export interface RealTradingGateControls {
+  approval_granted?: boolean;
+  kill_switch_enabled?: boolean;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface SaveRealTradingGateControlsResult {
+  path: string;
+  controls: RealTradingGateControls;
+}
+
 export interface WatchlistInput {
   market: Market;
   symbol: string;
@@ -262,6 +274,29 @@ export async function loadWatchlistStore(memoryRoot: string): Promise<WatchlistS
   } catch {
     return createWatchlistStore();
   }
+}
+
+export async function loadRealTradingGateControls(memoryRoot: string): Promise<RealTradingGateControls> {
+  try {
+    const raw = JSON.parse(await readFile(realTradingGateControlsPath(memoryRoot), "utf8")) as RealTradingGateControls;
+    return normalizeRealTradingGateControls(raw);
+  } catch {
+    return {};
+  }
+}
+
+export async function saveRealTradingGateControls(
+  memoryRoot: string,
+  controls: RealTradingGateControls
+): Promise<SaveRealTradingGateControlsResult> {
+  const path = realTradingGateControlsPath(memoryRoot);
+  await mkdir(dirname(path), { recursive: true });
+  const normalized = normalizeRealTradingGateControls(controls);
+  await writeFile(path, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
+  return {
+    path,
+    controls: normalized
+  };
 }
 
 export function createBrokerCapabilityRegistry(configs: BrokerConfigMap = DEFAULT_BROKERS): BrokerCapability[] {
@@ -534,6 +569,19 @@ function hasCompletePilotRiskLimits(limits: PilotRiskLimits = {}): boolean {
 
 function watchlistPath(memoryRoot: string): string {
   return join(memoryRoot, "data", "trading", "watchlist.json");
+}
+
+function realTradingGateControlsPath(memoryRoot: string): string {
+  return join(memoryRoot, "data", "trading", "real-trading-gates.json");
+}
+
+function normalizeRealTradingGateControls(input: RealTradingGateControls): RealTradingGateControls {
+  return {
+    ...(typeof input.approval_granted === "boolean" ? { approval_granted: input.approval_granted } : {}),
+    ...(typeof input.kill_switch_enabled === "boolean" ? { kill_switch_enabled: input.kill_switch_enabled } : {}),
+    ...(typeof input.updated_at === "string" && input.updated_at.trim() ? { updated_at: input.updated_at.trim() } : {}),
+    ...(typeof input.updated_by === "string" && input.updated_by.trim() ? { updated_by: input.updated_by.trim() } : {})
+  };
 }
 
 function isStale(now: string, dataTimestamp: string, maxDataAgeMs: number): boolean {

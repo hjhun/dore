@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import type { DoreConfig } from "../../../packages/config/src/index.js";
+import { appendEvent } from "../../../packages/core/src/index.js";
 import type { ExecFileResult, FileEditRecord, PackageJsonLike, ProjectIntake } from "../../../packages/engineering/src/index.js";
 import {
   appendFileEditEvent,
@@ -20,11 +21,14 @@ import {
   createTradingSignal,
   createTradingStatus,
   ensureRealTradingBlocked,
+  loadRealTradingGateControls,
   loadWatchlistStore,
   runRiskCheck,
+  saveRealTradingGateControls,
   summarizeDryRunJournal,
   type ExecutionMode,
   type Market,
+  type RealTradingGateControls,
   type SimulatedOrder
 } from "../../../packages/trading/src/index.js";
 
@@ -125,6 +129,78 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
   });
 
   app.get("/trading/status", async () => createLocalTradingStatus(memoryRoot, startedAt, options.tradingConfig));
+
+  app.post("/trading/gates/approval", async (request, reply) => {
+    const payload = request.body as Record<string, unknown> | null;
+    const approved = payload?.approved;
+    if (typeof approved !== "boolean") {
+      return reply.code(400).send({
+        error: "approval_required"
+      });
+    }
+
+    const now = stringField(payload, "now", new Date().toISOString());
+    const controls = await mergeAndSaveTradingGateControls(memoryRoot, {
+      approval_granted: approved,
+      updated_at: now,
+      updated_by: "user"
+    });
+    const eventLogPath = await appendTradingGateEvent(memoryRoot, {
+      id: createEventId(now, "approval"),
+      time: now,
+      eventType: "approval_decided",
+      entityType: "approval",
+      entityId: "trading_real_gate_approval",
+      summary: approved ? "trading_real_gate_approval_granted" : "trading_real_gate_approval_revoked",
+      refs: [controls.path],
+      detail: {
+        approval_granted: approved,
+        reason: stringField(payload, "reason", "No reason provided.")
+      }
+    });
+
+    return reply.code(201).send({
+      controls: controls.controls,
+      controls_path: controls.path,
+      event_log: eventLogPath
+    });
+  });
+
+  app.post("/trading/gates/kill-switch", async (request, reply) => {
+    const payload = request.body as Record<string, unknown> | null;
+    const enabled = payload?.enabled;
+    if (typeof enabled !== "boolean") {
+      return reply.code(400).send({
+        error: "kill_switch_state_required"
+      });
+    }
+
+    const now = stringField(payload, "now", new Date().toISOString());
+    const controls = await mergeAndSaveTradingGateControls(memoryRoot, {
+      kill_switch_enabled: enabled,
+      updated_at: now,
+      updated_by: "user"
+    });
+    const eventLogPath = await appendTradingGateEvent(memoryRoot, {
+      id: createEventId(now, "kill_switch"),
+      time: now,
+      eventType: "task_updated",
+      entityType: "task",
+      entityId: "trading_kill_switch",
+      summary: "trading_kill_switch_updated",
+      refs: [controls.path],
+      detail: {
+        kill_switch_enabled: enabled,
+        reason: stringField(payload, "reason", "No reason provided.")
+      }
+    });
+
+    return reply.code(201).send({
+      controls: controls.controls,
+      controls_path: controls.path,
+      event_log: eventLogPath
+    });
+  });
 
   app.post("/trading/signals/dry-run", async (request, reply) => {
     const payload = request.body as Record<string, unknown> | null;
@@ -377,6 +453,7 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
 async function createLocalTradingStatus(memoryRoot: string, now: Date, tradingConfig?: DoreConfig["trading"]) {
   const month = now.toISOString().slice(0, 7);
   const watchlist = await loadWatchlistStore(memoryRoot);
+  const controls = await loadRealTradingGateControls(memoryRoot);
   const gateConfig = tradingConfig?.real_trading_gates;
   const realTradingGate = createRealTradingGateStatus({
     realTradingRequested: tradingConfig?.real_trading_enabled ?? false,
@@ -386,9 +463,9 @@ async function createLocalTradingStatus(memoryRoot: string, now: Date, tradingCo
     brokerCredentialRefs: gateConfig?.broker_credentials,
     dryRunObservedDays: gateConfig?.dry_run_observed_days ?? 0,
     dryRunMinDays: gateConfig?.dry_run_min_days ?? 30,
-    killSwitchEnabled: gateConfig?.kill_switch_enabled ?? true,
+    killSwitchEnabled: controls.kill_switch_enabled ?? gateConfig?.kill_switch_enabled ?? true,
     approvalRequired: gateConfig?.approval_required ?? true,
-    approvalGranted: gateConfig?.approval_granted ?? false,
+    approvalGranted: controls.approval_granted ?? gateConfig?.approval_granted ?? false,
     riskLimits: gateConfig?.risk_limits
   });
   return createTradingStatus({
@@ -398,6 +475,43 @@ async function createLocalTradingStatus(memoryRoot: string, now: Date, tradingCo
     dryRunJournal: await summarizeDryRunJournal(memoryRoot, month),
     realTradingGate
   });
+}
+
+async function mergeAndSaveTradingGateControls(memoryRoot: string, update: RealTradingGateControls) {
+  const current = await loadRealTradingGateControls(memoryRoot);
+  return saveRealTradingGateControls(memoryRoot, {
+    ...current,
+    ...update
+  });
+}
+
+async function appendTradingGateEvent(
+  memoryRoot: string,
+  input: {
+    id: string;
+    time: string;
+    eventType: "approval_decided" | "task_updated";
+    entityType: "approval" | "task";
+    entityId: string;
+    summary: string;
+    refs: string[];
+    detail: Record<string, unknown>;
+  }
+): Promise<string> {
+  const eventLogPath = join(memoryRoot, "logs", "events", "trading.jsonl");
+  await appendEvent(eventLogPath, {
+    id: input.id,
+    time: input.time,
+    actor: "user",
+    event_type: input.eventType,
+    entity_type: input.entityType,
+    entity_id: input.entityId,
+    summary: input.summary,
+    risk_level: "trade",
+    refs: input.refs,
+    ...input.detail
+  });
+  return eventLogPath;
 }
 
 function stringField(payload: Record<string, unknown> | null, key: string, fallback = ""): string {
@@ -460,6 +574,11 @@ function createSignalId(now: string, market: Market, symbol: string): string {
   const timestamp = now.replace(/\D/g, "").slice(0, 14) || "manual";
   const safeSymbol = symbol.trim().replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "UNKNOWN";
   return `signal_${timestamp}_${market}_${safeSymbol}_manual`;
+}
+
+function createEventId(now: string, suffix: string): string {
+  const timestamp = now.replace(/\D/g, "").slice(0, 14) || "manual";
+  return `event_${timestamp}_trading_${suffix}`;
 }
 
 function isAllowedEngineeringCommand(command: string): boolean {

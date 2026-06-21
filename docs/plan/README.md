@@ -13,11 +13,10 @@ Use this plan as the day-to-day development source of truth. The draft documents
 
 ## Current Development Focus
 
-Current focus: Milestone 6, pilot real trading approval and kill-switch controls.
+Current focus: Milestone 6, pilot real trading acceptance audit.
 
 The next working slice must provide:
 
-- approval and kill-switch control routes.
-- persisted audit events for any gate state changes.
-- tests proving these controls do not create real order paths.
-- daemon and desktop status visibility for blocked gate state.
+- acceptance evidence for config gates, status gates, control routes, and blocked real-order paths.
+- explicit known boundaries for missing broker/API details.
+- verification that approval and kill-switch controls do not enable real trading by themselves.

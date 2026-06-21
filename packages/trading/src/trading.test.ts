@@ -12,8 +12,10 @@ import {
   createWatchlistStore,
   ensureRealTradingBlocked,
   loadWatchlistStore,
+  loadRealTradingGateControls,
   createRealTradingGateStatus,
   runRiskCheck,
+  saveRealTradingGateControls,
   saveWatchlistStore,
   summarizeDryRunJournal
 } from "./index.js";
@@ -409,5 +411,25 @@ describe("trading watch and dry-run foundations", () => {
     expect(gate.status).toBe("ready");
     expect(gate.blocked_reasons).toEqual([]);
     expect(gate.checks.every((check) => check.status === "pass")).toBe(true);
+  });
+
+  it("persists pilot real trading gate controls under memory data", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-trading-"));
+
+    const result = await saveRealTradingGateControls(memoryRoot, {
+      approval_granted: true,
+      kill_switch_enabled: false,
+      updated_at: "2026-06-22T09:00:00.000Z",
+      updated_by: "user"
+    });
+    const restored = await loadRealTradingGateControls(memoryRoot);
+
+    expect(result.path).toContain("/data/trading/real-trading-gates.json");
+    expect(restored).toEqual({
+      approval_granted: true,
+      kill_switch_enabled: false,
+      updated_at: "2026-06-22T09:00:00.000Z",
+      updated_by: "user"
+    });
   });
 });

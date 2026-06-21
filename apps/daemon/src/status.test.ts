@@ -288,4 +288,121 @@ describe("daemon status", () => {
     });
     expect(body.blocked_actions).toContain("Trading kill switch is enabled.");
   });
+
+  it("records approval control changes without enabling real trading", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-trading-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      tradingConfig: parseConfig({
+        trading: {
+          real_trading_enabled: true,
+          real_trading_gates: {
+            explicit_enable: true,
+            official_api_verified: false,
+            terms_verified: false,
+            dry_run_observed_days: 30,
+            kill_switch_enabled: true,
+            approval_required: true,
+            approval_granted: false,
+            risk_limits: {
+              max_order_krw_equivalent: 100_000,
+              max_daily_new_buy_krw_equivalent: 300_000,
+              max_daily_loss_krw_equivalent: 100_000,
+              max_position_pct: 10
+            }
+          }
+        }
+      }).trading
+    });
+
+    const control = await app.inject({
+      method: "POST",
+      url: "/trading/gates/approval",
+      payload: {
+        approved: true,
+        now: "2026-06-22T09:00:00.000Z",
+        reason: "Allow gate evaluation only."
+      }
+    });
+
+    expect(control.statusCode).toBe(201);
+    const controlBody = control.json();
+    expect(controlBody.controls.approval_granted).toBe(true);
+    expect(await readFile(controlBody.event_log, "utf8")).toContain("approval_decided");
+
+    const status = await app.inject({
+      method: "GET",
+      url: "/trading/status"
+    });
+    const statusBody = status.json();
+    expect(statusBody.real_trading_enabled).toBe(false);
+    expect(statusBody.real_trading_gate.checks).toContainEqual(
+      expect.objectContaining({
+        id: "approval",
+        status: "pass"
+      })
+    );
+    expect(statusBody.real_trading_gate.blocked_reasons).toContain("Official broker API is not verified.");
+  });
+
+  it("persists kill-switch control changes across daemon restarts without real orders", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-trading-"));
+    const tradingConfig = parseConfig({
+      trading: {
+        real_trading_enabled: true,
+        real_trading_gates: {
+          explicit_enable: true,
+          official_api_verified: false,
+          terms_verified: false,
+          dry_run_observed_days: 30,
+          kill_switch_enabled: true,
+          approval_required: true,
+          approval_granted: true,
+          risk_limits: {
+            max_order_krw_equivalent: 100_000,
+            max_daily_new_buy_krw_equivalent: 300_000,
+            max_daily_loss_krw_equivalent: 100_000,
+            max_position_pct: 10
+          }
+        }
+      }
+    }).trading;
+    const app = createDaemonApp({
+      memoryRoot,
+      tradingConfig
+    });
+
+    const control = await app.inject({
+      method: "POST",
+      url: "/trading/gates/kill-switch",
+      payload: {
+        enabled: false,
+        now: "2026-06-22T09:05:00.000Z",
+        reason: "Operator verified emergency stop reset."
+      }
+    });
+
+    expect(control.statusCode).toBe(201);
+    expect(control.json().controls.kill_switch_enabled).toBe(false);
+    expect(await readFile(control.json().event_log, "utf8")).toContain("trading_kill_switch_updated");
+
+    const restarted = createDaemonApp({
+      memoryRoot,
+      tradingConfig
+    });
+    const status = await restarted.inject({
+      method: "GET",
+      url: "/trading/status"
+    });
+    const body = status.json();
+    expect(body.real_trading_enabled).toBe(false);
+    expect(body.real_trading_gate.checks).toContainEqual(
+      expect.objectContaining({
+        id: "kill_switch",
+        status: "pass"
+      })
+    );
+    expect(body.real_trading_gate.blocked_reasons).not.toContain("Trading kill switch is enabled.");
+    expect(body.real_trading_gate.blocked_reasons).toContain("Official broker API is not verified.");
+  });
 });

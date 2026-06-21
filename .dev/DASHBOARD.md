@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M6, Pilot Real Trading Preparation
-- Current task: M6 real-trading gate scaffolding implemented; next is approval/kill-switch controls
+- Current task: M6 approval/kill-switch controls implemented; next is M6 acceptance audit
 
 ## Milestone Progress
 
@@ -96,6 +96,8 @@ Update it whenever development state changes.
 - [x] M6 kill switch gate is represented in daemon and desktop status.
 - [x] M6 approval gate is represented before real execution.
 - [x] M6 risk limit gate is represented before real execution.
+- [x] M6 approval control route records audit events.
+- [x] M6 kill-switch control route persists across daemon restarts.
 
 ## M0 Checklist
 
@@ -219,7 +221,10 @@ Update it whenever development state changes.
 - [x] Kill switch gate is visible and defaults to blocking.
 - [x] Approval gate is required before any future real execution.
 - [x] Risk limit gate is required before any future real execution.
-- [ ] Missing official broker API details keep all real order paths blocked.
+- [x] Approval control changes are written to append-only trading events.
+- [x] Kill-switch control changes are written to append-only trading events.
+- [x] Kill-switch control changes persist across daemon restarts.
+- [x] Missing official broker API details keep all real order paths blocked.
 
 ## Verification Log
 
@@ -360,6 +365,12 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M6 gate scaffolding.
 - 2026-06-22: Docs relative link check passed after M6 gate scaffolding docs update.
 - 2026-06-22: Changed-file secret-like scan found no plaintext secret values after M6 gate scaffolding.
+- 2026-06-22: M6 approval/kill-switch route TDD red phase confirmed with missing control routes.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M6 control routes, 15 files and 88 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M6 control routes.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M6 control routes.
+- 2026-06-22: Docs relative link check passed after M6 control route docs update.
+- 2026-06-22: Changed-file secret-like scan found no plaintext secret values after M6 control routes.
 
 ## Known Constraints
 
@@ -372,5 +383,5 @@ Update it whenever development state changes.
 
 Continue M6 Pilot Real Trading Preparation:
 
-1. Add approval and kill-switch control routes without enabling real orders.
+1. Add a M6 acceptance audit against roadmap acceptance.
 2. Keep all real broker/order paths blocked until user supplies official API details.
