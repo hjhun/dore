@@ -6,10 +6,17 @@ Dore is a local-first personal AI assistant for one user. It must support daily 
 
 Authoritative product and design documents live in `docs/drafts/`. Start there before implementing.
 
+Execution plans live in `docs/plan/`. Use those for current development order.
+
+Progress state lives in `.dev/DASHBOARD.md`. Update it before ending a development turn.
+
 ## Current Source Of Truth
 
 Read these first for any meaningful change:
 
+- `.dev/DASHBOARD.md`
+- `docs/plan/README.md`
+- `docs/plan/ROADMAP.md`
 - `docs/drafts/README.md`
 - `docs/drafts/23_PRODUCT_REQUIREMENTS.md`
 - `docs/drafts/26_ACCEPTANCE_CRITERIA.md`
@@ -59,6 +66,21 @@ Required test focus:
 - Real trading disabled path: when `real_trading_enabled: false`, no real order API may be called.
 
 Do not claim normal operation unless the relevant tests or manual verification were run and passed. If a test fails, fix the code and rerun. If verification cannot be run, say why and do not claim the behavior is guaranteed.
+
+## Plan-Driven Development
+
+Implement according to `docs/plan/ROADMAP.md`.
+
+Current milestone state must be reflected in `.dev/DASHBOARD.md`.
+
+Rules:
+
+- Start each session by reading `.dev/DASHBOARD.md`.
+- Use `docs/plan/MILESTONE_0_BOOTSTRAP.md` for M0 scope and acceptance.
+- Keep checkboxes accurate. Use `- [ ]` and `- [x]`.
+- Do not mark a checklist item complete until the relevant files and verification prove it.
+- If the implementation plan changes, update `docs/plan/` and `.dev/DASHBOARD.md` in the same patch.
+- If a blocker appears, write it under `.dev/DASHBOARD.md` with the failed command or missing information.
 
 ## Patch Discipline
 
@@ -227,4 +249,3 @@ Before reporting completion:
 - No secrets present.
 - No unrelated changes reverted.
 - If publishing was requested, branch/commit/push/PR status reported.
-

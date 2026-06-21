@@ -1,0 +1,35 @@
+app:
+  name: Dore
+  timezone: Asia/Seoul
+  locale: ko-KR
+
+llm:
+  default_provider: openai
+  default_model: gpt-5.4
+
+telegram:
+  enabled: true
+  mode: long_polling
+  bot_token_env: TELEGRAM_BOT_TOKEN
+  allowed_user_ids: []
+
+memory:
+  root: memory
+
+trading:
+  enabled: true
+  real_trading_enabled: false
+  brokers:
+    toss:
+      enabled: true
+      priority: 1
+      mode: candidate
+    shinhan:
+      enabled: true
+      priority: 2
+      mode: candidate
+    samsung:
+      enabled: true
+      priority: 3
+      mode: read_only_manual_reference
+
