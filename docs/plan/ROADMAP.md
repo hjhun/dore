@@ -188,7 +188,10 @@ Status:
 - Broker capabilities expose Toss and Shinhan as candidates and Samsung as read-only/manual reference.
 - Daemon `/status` and `GET /trading/status` expose broker capability and watchlist status.
 - `real_trading_enabled: false` blocks real execution mode.
-- Remaining work is market data adapter interfaces, trading signal creation, risk manager, and dry-run journal.
+- Trading signals can be created through the runtime contract shape.
+- Deterministic risk checks block stale data, oversize orders, daily limit breaches, kill switch, closed market, and disabled real trading.
+- Dry-run journal entries can be appended under `memory/logs/trading/YYYY-MM.jsonl`.
+- Remaining work is market data adapter interfaces and daemon trading status summaries for dry-run journal history.
 
 Deliverables:
 

@@ -1,4 +1,11 @@
-import { BrokerCapabilitySchema, type BrokerCapability } from "../../contracts/src/index.js";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import {
+  BrokerCapabilitySchema,
+  TradingSignalSchema,
+  type BrokerCapability,
+  type TradingSignal
+} from "../../contracts/src/index.js";
 
 export type BrokerId = "toss" | "shinhan" | "samsung";
 export type BrokerMode = "candidate" | "read_only_manual_reference" | "paper" | "real";
@@ -48,6 +55,70 @@ export interface TradingStatus {
     items: WatchlistItem[];
   };
   blocked_actions: string[];
+}
+
+export interface RiskPolicy {
+  maxOrderKrwEquivalent: number;
+  maxDailyNewBuyKrwEquivalent: number;
+  maxDataAgeMs: number;
+  killSwitchEnabled: boolean;
+}
+
+export interface RiskCheckInput {
+  now: string;
+  dataTimestamp: string;
+  executionMode: ExecutionMode;
+  realTradingEnabled: boolean;
+  marketOpen: boolean;
+  orderAmountKrwEquivalent: number;
+  dailyNewBuyKrwEquivalent: number;
+  policy: RiskPolicy;
+}
+
+export interface RiskCheckResult {
+  status: "pass" | "fail" | "blocked" | "not_applicable";
+  reasons: string[];
+}
+
+export interface CreateTradingSignalInput {
+  signalId: string;
+  createdAt: string;
+  market: Market;
+  symbol: string;
+  strategyId: string;
+  direction: "buy" | "sell" | "hold" | "reduce" | "watch";
+  confidence: "low" | "medium" | "high";
+  reason: string;
+  dataTimestamp: string;
+  sourceRefs: string[];
+  riskCheck: RiskCheckResult;
+  recommendedAction: string;
+  executionMode: ExecutionMode;
+  expiresAt: string;
+}
+
+export interface SimulatedOrder {
+  side: "buy" | "sell";
+  quantity: number;
+  estimatedPrice: number;
+  currency: "KRW" | "USD";
+}
+
+export interface DryRunJournalEntry {
+  id: string;
+  created_at: string;
+  signal_id: string;
+  market: Market;
+  symbol: string;
+  strategy_id: string;
+  execution_mode: "dry_run";
+  risk_check: RiskCheckResult;
+  simulated_order: SimulatedOrder;
+}
+
+export interface AppendDryRunJournalEntryResult {
+  path: string;
+  entry: DryRunJournalEntry;
 }
 
 const BROKER_ORDER: BrokerId[] = ["toss", "shinhan", "samsung"];
@@ -118,6 +189,88 @@ export function createTradingStatus(input: CreateTradingStatusInput): TradingSta
   };
 }
 
+export function runRiskCheck(input: RiskCheckInput): RiskCheckResult {
+  const reasons: string[] = [];
+
+  if (input.executionMode === "real" && !input.realTradingEnabled) {
+    reasons.push("Real trading is disabled.");
+  }
+  if (input.policy.killSwitchEnabled) {
+    reasons.push("Trading kill switch is enabled.");
+  }
+  if (!input.marketOpen) {
+    reasons.push("Market is closed.");
+  }
+  if (isStale(input.now, input.dataTimestamp, input.policy.maxDataAgeMs)) {
+    reasons.push("Market data is stale.");
+  }
+  if (input.orderAmountKrwEquivalent > input.policy.maxOrderKrwEquivalent) {
+    reasons.push("Order amount exceeds max order limit.");
+  }
+  if (input.dailyNewBuyKrwEquivalent > input.policy.maxDailyNewBuyKrwEquivalent) {
+    reasons.push("Daily new buy amount exceeds max daily limit.");
+  }
+
+  return {
+    status: reasons.length > 0 ? "blocked" : "pass",
+    reasons
+  };
+}
+
+export function createTradingSignal(input: CreateTradingSignalInput): TradingSignal {
+  return TradingSignalSchema.parse({
+    signal_id: input.signalId,
+    created_at: input.createdAt,
+    market: input.market,
+    symbol: normalizeSymbol(input.market, input.symbol),
+    strategy_id: input.strategyId,
+    direction: input.direction,
+    confidence: input.confidence,
+    reason: input.reason,
+    data_timestamp: input.dataTimestamp,
+    source_refs: input.sourceRefs,
+    risk_check: input.riskCheck,
+    recommended_action: input.recommendedAction,
+    execution_mode: input.executionMode,
+    expires_at: input.expiresAt
+  });
+}
+
+export function createDryRunJournalEntry(input: {
+  signal: TradingSignal;
+  createdAt: string;
+  simulatedOrder: SimulatedOrder;
+}): DryRunJournalEntry {
+  if (input.signal.execution_mode === "real") {
+    throw new Error("Dry-run journal cannot record real execution signals.");
+  }
+
+  return {
+    id: `dry_run_${input.signal.signal_id}`,
+    created_at: input.createdAt,
+    signal_id: input.signal.signal_id,
+    market: input.signal.market,
+    symbol: input.signal.symbol,
+    strategy_id: input.signal.strategy_id,
+    execution_mode: "dry_run",
+    risk_check: input.signal.risk_check,
+    simulated_order: input.simulatedOrder
+  };
+}
+
+export async function appendDryRunJournalEntry(
+  memoryRoot: string,
+  entry: DryRunJournalEntry
+): Promise<AppendDryRunJournalEntryResult> {
+  const path = join(memoryRoot, "logs", "trading", `${entry.created_at.slice(0, 7)}.jsonl`);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(entry)}\n`, { flag: "a" });
+  return {
+    path,
+    entry
+  };
+}
+
 function mergeBrokerConfigs(configs: BrokerConfigMap): Record<BrokerId, BrokerConfig> {
   return {
     toss: {
@@ -133,6 +286,15 @@ function mergeBrokerConfigs(configs: BrokerConfigMap): Record<BrokerId, BrokerCo
       ...configs.samsung
     }
   };
+}
+
+function isStale(now: string, dataTimestamp: string, maxDataAgeMs: number): boolean {
+  const nowMs = Date.parse(now);
+  const dataMs = Date.parse(dataTimestamp);
+  if (!Number.isFinite(nowMs) || !Number.isFinite(dataMs)) {
+    return true;
+  }
+  return nowMs - dataMs > maxDataAgeMs;
 }
 
 function normalizeSymbol(market: Market, symbol: string): string {

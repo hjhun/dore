@@ -1,9 +1,16 @@
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  appendDryRunJournalEntry,
   createBrokerCapabilityRegistry,
+  createDryRunJournalEntry,
+  createTradingSignal,
   createTradingStatus,
   createWatchlistStore,
-  ensureRealTradingBlocked
+  ensureRealTradingBlocked,
+  runRiskCheck
 } from "./index.js";
 
 describe("trading watch and dry-run foundations", () => {
@@ -102,5 +109,122 @@ describe("trading watch and dry-run foundations", () => {
       })
     );
     expect(status.blocked_actions).toContain("Real trading disabled.");
+  });
+
+  it("blocks real execution mode through deterministic risk checks", () => {
+    const risk = runRiskCheck({
+      now: "2026-06-22T09:00:00.000Z",
+      dataTimestamp: "2026-06-22T08:59:00.000Z",
+      executionMode: "real",
+      realTradingEnabled: false,
+      marketOpen: true,
+      orderAmountKrwEquivalent: 50_000,
+      dailyNewBuyKrwEquivalent: 50_000,
+      policy: {
+        maxOrderKrwEquivalent: 100_000,
+        maxDailyNewBuyKrwEquivalent: 300_000,
+        maxDataAgeMs: 5 * 60 * 1000,
+        killSwitchEnabled: false
+      }
+    });
+
+    expect(risk.status).toBe("blocked");
+    expect(risk.reasons).toContain("Real trading is disabled.");
+  });
+
+  it("blocks stale data and oversized dry-run candidates", () => {
+    const risk = runRiskCheck({
+      now: "2026-06-22T09:10:00.000Z",
+      dataTimestamp: "2026-06-22T09:00:00.000Z",
+      executionMode: "dry_run",
+      realTradingEnabled: false,
+      marketOpen: true,
+      orderAmountKrwEquivalent: 150_000,
+      dailyNewBuyKrwEquivalent: 350_000,
+      policy: {
+        maxOrderKrwEquivalent: 100_000,
+        maxDailyNewBuyKrwEquivalent: 300_000,
+        maxDataAgeMs: 5 * 60 * 1000,
+        killSwitchEnabled: false
+      }
+    });
+
+    expect(risk.status).toBe("blocked");
+    expect(risk.reasons).toEqual([
+      "Market data is stale.",
+      "Order amount exceeds max order limit.",
+      "Daily new buy amount exceeds max daily limit."
+    ]);
+  });
+
+  it("creates trading signals with runtime contract shape", () => {
+    const signal = createTradingSignal({
+      signalId: "signal_20260622_005930_watch",
+      createdAt: "2026-06-22T09:00:00.000Z",
+      market: "korea",
+      symbol: "005930",
+      strategyId: "watch_momentum",
+      direction: "watch",
+      confidence: "low",
+      reason: "Initial deterministic watch candidate.",
+      dataTimestamp: "2026-06-22T08:59:00.000Z",
+      sourceRefs: ["watchlist"],
+      riskCheck: {
+        status: "pass",
+        reasons: []
+      },
+      recommendedAction: "Record dry-run candidate only.",
+      executionMode: "dry_run",
+      expiresAt: "2026-06-22T15:30:00.000Z"
+    });
+
+    expect(signal.execution_mode).toBe("dry_run");
+    expect(signal.risk_check.status).toBe("pass");
+  });
+
+  it("appends dry-run journal entries under memory logs", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-trading-"));
+    const signal = createTradingSignal({
+      signalId: "signal_20260622_AAPL_watch",
+      createdAt: "2026-06-22T09:00:00.000Z",
+      market: "us",
+      symbol: "AAPL",
+      strategyId: "watch_momentum",
+      direction: "watch",
+      confidence: "low",
+      reason: "Initial deterministic watch candidate.",
+      dataTimestamp: "2026-06-22T08:59:00.000Z",
+      sourceRefs: ["watchlist"],
+      riskCheck: {
+        status: "pass",
+        reasons: []
+      },
+      recommendedAction: "Record dry-run candidate only.",
+      executionMode: "dry_run",
+      expiresAt: "2026-06-22T15:30:00.000Z"
+    });
+    const entry = createDryRunJournalEntry({
+      signal,
+      createdAt: "2026-06-22T09:00:00.000Z",
+      simulatedOrder: {
+        side: "buy",
+        quantity: 1,
+        estimatedPrice: 100,
+        currency: "USD"
+      }
+    });
+
+    const result = await appendDryRunJournalEntry(memoryRoot, entry);
+
+    expect(result.path).toContain("/logs/trading/2026-06.jsonl");
+    const [line] = (await readFile(result.path, "utf8")).trim().split("\n");
+    expect(JSON.parse(line)).toMatchObject({
+      signal_id: "signal_20260622_AAPL_watch",
+      execution_mode: "dry_run",
+      simulated_order: {
+        side: "buy",
+        quantity: 1
+      }
+    });
   });
 });
