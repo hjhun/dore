@@ -39,6 +39,11 @@ export interface WatchlistStore {
   items: WatchlistItem[];
 }
 
+export interface SaveWatchlistStoreResult {
+  path: string;
+  store: WatchlistStore;
+}
+
 export interface CreateTradingStatusInput {
   realTradingEnabled: boolean;
   brokers?: BrokerConfigMap;
@@ -194,6 +199,26 @@ export function createWatchlistStore(inputs: WatchlistInput[] = []): WatchlistSt
       };
     })
   };
+}
+
+export async function saveWatchlistStore(memoryRoot: string, store: WatchlistStore): Promise<SaveWatchlistStoreResult> {
+  const path = watchlistPath(memoryRoot);
+  await mkdir(dirname(path), { recursive: true });
+  const normalized = createWatchlistStore(store.items);
+  await writeFile(path, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
+  return {
+    path,
+    store: normalized
+  };
+}
+
+export async function loadWatchlistStore(memoryRoot: string): Promise<WatchlistStore> {
+  try {
+    const raw = JSON.parse(await readFile(watchlistPath(memoryRoot), "utf8")) as { items?: WatchlistInput[] };
+    return createWatchlistStore(raw.items ?? []);
+  } catch {
+    return createWatchlistStore();
+  }
 }
 
 export function createBrokerCapabilityRegistry(configs: BrokerConfigMap = DEFAULT_BROKERS): BrokerCapability[] {
@@ -380,6 +405,10 @@ function mergeBrokerConfigs(configs: BrokerConfigMap): Record<BrokerId, BrokerCo
       ...configs.samsung
     }
   };
+}
+
+function watchlistPath(memoryRoot: string): string {
+  return join(memoryRoot, "data", "trading", "watchlist.json");
 }
 
 function isStale(now: string, dataTimestamp: string, maxDataAgeMs: number): boolean {

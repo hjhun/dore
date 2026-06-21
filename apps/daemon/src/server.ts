@@ -12,7 +12,7 @@ import {
 } from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
 import { createTelegramAdapterStatus } from "../../../packages/telegram/src/index.js";
-import { createTradingStatus, summarizeDryRunJournal } from "../../../packages/trading/src/index.js";
+import { createTradingStatus, loadWatchlistStore, summarizeDryRunJournal } from "../../../packages/trading/src/index.js";
 
 export interface DaemonAppOptions {
   startedAt?: Date;
@@ -272,8 +272,10 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
 
 async function createLocalTradingStatus(memoryRoot: string, now: Date) {
   const month = now.toISOString().slice(0, 7);
+  const watchlist = await loadWatchlistStore(memoryRoot);
   return createTradingStatus({
     realTradingEnabled: false,
+    watchlist: watchlist.items,
     dryRunJournal: await summarizeDryRunJournal(memoryRoot, month)
   });
 }

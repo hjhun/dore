@@ -194,7 +194,8 @@ Status:
 - Static market data adapters provide a local interface for future broker/data-source connectors.
 - Daemon trading status includes dry-run journal summary for the current month.
 - Desktop Dashboard maps and renders dry-run journal summary from daemon status.
-- Remaining work is optional safe watchlist persistence and manual signal creation routes.
+- Watchlists can be persisted under local memory data and restored into daemon trading status.
+- Remaining work is optional manual signal creation routes and an M5 acceptance audit.
 
 Deliverables:
 

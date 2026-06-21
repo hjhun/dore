@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M5, Trading Watch and Dry-run
-- Current task: market data adapter and dry-run summary visibility implemented; next is safe watchlist persistence
+- Current task: safe watchlist persistence implemented; next is optional manual signal route
 
 ## Milestone Progress
 
@@ -86,6 +86,8 @@ Update it whenever development state changes.
 - [x] M5 market data adapter interface implemented.
 - [x] M5 dry-run journal summary exposed through daemon trading status.
 - [x] M5 dry-run journal summary visible in desktop Dashboard.
+- [x] M5 watchlist persistence implemented.
+- [x] M5 persisted watchlist is visible in daemon trading status.
 
 ## M0 Checklist
 
@@ -195,6 +197,8 @@ Update it whenever development state changes.
 - [x] Signal and dry-run journal entries can be created.
 - [x] Dry-run journal summary is exposed in daemon trading status.
 - [x] Desktop Dashboard shows dry-run journal summary.
+- [x] Watchlist can be persisted under local memory data.
+- [x] Persisted watchlist items are exposed in daemon trading status.
 
 ## Verification Log
 
@@ -309,6 +313,13 @@ Update it whenever development state changes.
 - 2026-06-22: Docs relative link check passed after M5 market data adapter and dry-run summary visibility work.
 - 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 - 2026-06-22: M5 market data adapter and dry-run summary visibility pushed to `origin/codex/add-agent-development-guide` at commit `b04620a`.
+- 2026-06-22: M5 watchlist persistence tests added; TDD red phase confirmed for missing `saveWatchlistStore` and `loadWatchlistStore`.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts apps/daemon/src/status.test.ts` passed, 15 files and 77 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 15 files and 77 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M5 watchlist persistence work.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 watchlist persistence work.
+- 2026-06-22: Docs relative link check passed after M5 watchlist persistence docs update.
+- 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 
 ## Known Constraints
 
@@ -321,6 +332,6 @@ Update it whenever development state changes.
 
 Continue M5 Trading Watch and Dry-run:
 
-1. Add safe watchlist persistence for manual user-managed symbols.
-2. Add a manual trading signal creation route if needed.
+1. Add a manual trading signal creation route if needed.
+2. Add a M5 completion audit against roadmap acceptance.
 3. Keep all real broker/order paths blocked until user supplies official API details.

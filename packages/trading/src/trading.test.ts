@@ -11,7 +11,9 @@ import {
   createTradingStatus,
   createWatchlistStore,
   ensureRealTradingBlocked,
+  loadWatchlistStore,
   runRiskCheck,
+  saveWatchlistStore,
   summarizeDryRunJournal
 } from "./index.js";
 
@@ -304,5 +306,43 @@ describe("trading watch and dry-run foundations", () => {
       passed: 0,
       blocked: 0
     });
+  });
+
+  it("persists and restores a safe watchlist under memory data", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-trading-"));
+    const store = createWatchlistStore([
+      {
+        market: "korea",
+        symbol: "005930",
+        name: "Samsung Electronics"
+      },
+      {
+        market: "us",
+        symbol: "msft",
+        name: "Microsoft",
+        enabled: false
+      }
+    ]);
+
+    const result = await saveWatchlistStore(memoryRoot, store);
+    const restored = await loadWatchlistStore(memoryRoot);
+
+    expect(result.path).toContain("/data/trading/watchlist.json");
+    expect(restored.items).toEqual([
+      {
+        id: "watch_korea_005930",
+        market: "korea",
+        symbol: "005930",
+        name: "Samsung Electronics",
+        enabled: true
+      },
+      {
+        id: "watch_us_MSFT",
+        market: "us",
+        symbol: "MSFT",
+        name: "Microsoft",
+        enabled: false
+      }
+    ]);
   });
 });

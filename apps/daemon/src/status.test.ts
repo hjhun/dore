@@ -2,7 +2,13 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { appendDryRunJournalEntry, createDryRunJournalEntry, createTradingSignal } from "../../../packages/trading/src/index.js";
+import {
+  appendDryRunJournalEntry,
+  createDryRunJournalEntry,
+  createTradingSignal,
+  createWatchlistStore,
+  saveWatchlistStore
+} from "../../../packages/trading/src/index.js";
 import { createDaemonApp } from "./server.js";
 
 describe("daemon status", () => {
@@ -115,5 +121,37 @@ describe("daemon status", () => {
       blocked: 0,
       latest_signal_id: "signal_20260622_AAPL_status"
     });
+  });
+
+  it("includes persisted watchlist items in trading status", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-trading-"));
+    await saveWatchlistStore(
+      memoryRoot,
+      createWatchlistStore([
+        {
+          market: "korea",
+          symbol: "005930",
+          name: "Samsung Electronics"
+        }
+      ])
+    );
+    const app = createDaemonApp({
+      memoryRoot,
+      startedAt: new Date("2026-06-22T00:00:00.000Z")
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/trading/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().watchlist.count).toBe(1);
+    expect(response.json().watchlist.items).toContainEqual(
+      expect.objectContaining({
+        id: "watch_korea_005930",
+        symbol: "005930"
+      })
+    );
   });
 });
