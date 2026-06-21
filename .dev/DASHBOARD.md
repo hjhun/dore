@@ -40,7 +40,7 @@ Update it whenever development state changes.
 - [x] M2 daemon scheduler integration implemented.
 - [x] M2 Telegram adapter safety status implemented.
 - [ ] M2 Telegram long polling adapter implemented.
-- [ ] M2 branch pushed.
+- [x] M2 branch pushed.
 
 ## M0 Checklist
 
@@ -108,6 +108,7 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
 - 2026-06-21: M2 daemon scheduler and Telegram adapter safety tests added; `npx --yes pnpm@11.8.0 test` passed, 9 files and 21 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after M2 daemon integration.
+- 2026-06-21: M2 scheduler and Telegram foundations pushed to `origin/codex/add-agent-development-guide` at commit `0200e9a`.
 
 ## Known Constraints
 
