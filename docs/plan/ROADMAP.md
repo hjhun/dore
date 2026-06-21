@@ -86,7 +86,7 @@ Status:
 - Telegram command authorization and command routing are implemented in `packages/telegram`.
 - Daemon `/status` exposes the default daily briefing scheduled job.
 - Telegram adapter safety status is implemented so it stays disabled without token or allowlist.
-- Remaining work is long polling lifecycle wiring without real network calls in tests.
+- Telegram long polling lifecycle shell is implemented with start/stop tests and no real network calls.
 
 Deliverables:
 

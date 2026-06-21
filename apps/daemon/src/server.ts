@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
+import { createTelegramAdapterStatus } from "../../../packages/telegram/src/index.js";
 
 export interface DaemonAppOptions {
   startedAt?: Date;
@@ -44,7 +45,12 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       },
       telegram: {
         configured: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-        allowlist_required: true
+        allowlist_required: true,
+        adapter: createTelegramAdapterStatus({
+          enabled: true,
+          botToken: process.env.TELEGRAM_BOT_TOKEN,
+          allowedUserIds: []
+        })
       },
       scheduler: {
         jobs: scheduler.list()

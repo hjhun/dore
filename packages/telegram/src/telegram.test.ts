@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTelegramAdapterStatus, handleTelegramCommand } from "./index.js";
+import { createTelegramAdapter, createTelegramAdapterStatus, handleTelegramCommand } from "./index.js";
 
 const context = {
   getStatus: async () => "Dore is running.",
@@ -65,6 +65,48 @@ describe("telegram command handling", () => {
         allowedUserIds: []
       })
     ).toMatchObject({ state: "disabled", reason: "empty_allowlist" });
+  });
+
+  it("does not start long polling when disabled", async () => {
+    let starts = 0;
+    const adapter = createTelegramAdapter({
+      enabled: true,
+      botToken: "",
+      allowedUserIds: [123],
+      poll: async () => {
+        starts += 1;
+      }
+    });
+
+    const start = await adapter.start();
+
+    expect(start).toMatchObject({ started: false, reason: "missing_token" });
+    expect(adapter.getState()).toBe("disabled");
+    expect(starts).toBe(0);
+  });
+
+  it("starts and stops long polling without real network calls", async () => {
+    let starts = 0;
+    let stops = 0;
+    const adapter = createTelegramAdapter({
+      enabled: true,
+      botToken: "token-ref",
+      allowedUserIds: [123],
+      poll: async (signal) => {
+        starts += 1;
+        signal.addEventListener("abort", () => {
+          stops += 1;
+        });
+      }
+    });
+
+    const start = await adapter.start();
+    adapter.stop();
+
+    expect(start).toMatchObject({ started: true });
+    expect(adapter.getState()).toBe("stopped");
+    expect(starts).toBe(1);
+    expect(stops).toBe(1);
   });
 });
 

@@ -39,7 +39,7 @@ Update it whenever development state changes.
 - [x] M2 Telegram command skeleton implemented for `/status`, `/briefing`, `/usage`, `/stop`.
 - [x] M2 daemon scheduler integration implemented.
 - [x] M2 Telegram adapter safety status implemented.
-- [ ] M2 Telegram long polling adapter implemented.
+- [x] M2 Telegram long polling adapter lifecycle implemented.
 - [x] M2 branch pushed.
 
 ## M0 Checklist
@@ -87,7 +87,7 @@ Update it whenever development state changes.
 - [x] Telegram command handler routes `/stop`.
 - [x] Daemon exposes scheduled job status.
 - [x] Telegram adapter is disabled without token or allowlist.
-- [ ] Telegram long polling network loop is wired.
+- [x] Telegram long polling lifecycle shell is wired without real network calls.
 
 ## Verification Log
 
@@ -109,6 +109,8 @@ Update it whenever development state changes.
 - 2026-06-21: M2 daemon scheduler and Telegram adapter safety tests added; `npx --yes pnpm@11.8.0 test` passed, 9 files and 21 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after M2 daemon integration.
 - 2026-06-21: M2 scheduler and Telegram foundations pushed to `origin/codex/add-agent-development-guide` at commit `0200e9a`.
+- 2026-06-21: M2 Telegram long polling lifecycle tests added; `npx --yes pnpm@11.8.0 test` passed, 9 files and 23 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after Telegram lifecycle shell.
 
 ## Known Constraints
 
@@ -119,9 +121,9 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Continue M2 Telegram long polling shell:
+Start M3 Electron Dashboard foundation:
 
-1. Add tests for a long polling adapter shell that does not start when disabled.
-2. Add adapter start/stop lifecycle without real network calls.
-3. Connect adapter status into daemon status.
-4. Keep real Telegram network calls out of tests.
+1. Add minimal Electron/Vite workspace shell.
+2. Add renderer smoke tests for Dashboard status sections.
+3. Keep Electron renderer away from secrets/filesystem.
+4. Show daemon, scheduler, Telegram, and trading status from mocked data first.

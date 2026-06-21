@@ -21,6 +21,10 @@ export interface TelegramAdapterConfig {
   allowedUserIds: number[];
 }
 
+export interface TelegramAdapterRuntimeConfig extends TelegramAdapterConfig {
+  poll(signal: AbortSignal): Promise<void>;
+}
+
 export type TelegramAdapterStatus =
   | { state: "disabled"; reason: "disabled_by_config" | "missing_token" | "empty_allowlist" }
   | { state: "ready"; mode: "long_polling" };
@@ -41,6 +45,42 @@ export function createTelegramAdapterStatus(config: TelegramAdapterConfig): Tele
     return { state: "disabled", reason: "empty_allowlist" };
   }
   return { state: "ready", mode: "long_polling" };
+}
+
+export function createTelegramAdapter(config: TelegramAdapterRuntimeConfig) {
+  const status = createTelegramAdapterStatus(config);
+  let controller: AbortController | null = null;
+  let state: "disabled" | "ready" | "running" | "stopped" = status.state === "ready" ? "ready" : "disabled";
+
+  return {
+    getStatus: () => status,
+    getState: () => state,
+    async start(): Promise<
+      | { started: false; reason: "disabled_by_config" | "missing_token" | "empty_allowlist" }
+      | { started: true }
+    > {
+      if (status.state === "disabled") {
+        state = "disabled";
+        return { started: false, reason: status.reason };
+      }
+      if (controller) {
+        return { started: true };
+      }
+      controller = new AbortController();
+      state = "running";
+      await config.poll(controller.signal);
+      return { started: true };
+    },
+    stop(): void {
+      if (controller) {
+        controller.abort();
+        controller = null;
+      }
+      if (status.state === "ready") {
+        state = "stopped";
+      }
+    }
+  };
 }
 
 export async function handleTelegramCommand(

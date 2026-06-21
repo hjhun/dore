@@ -19,6 +19,8 @@ describe("daemon status", () => {
     expect(body.app.name).toBe("Dore");
     expect(body.trading.real_trading_enabled).toBe(false);
     expect(body.providers.openai.configured).toBe(false);
+    expect(body.telegram.adapter.state).toBe("disabled");
+    expect(body.telegram.adapter.reason).toBe("missing_token");
     expect(body.scheduler.jobs).toContainEqual(
       expect.objectContaining({
         id: "daily_briefing_0600_kst",
