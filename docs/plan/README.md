@@ -10,6 +10,7 @@ Use this plan as the day-to-day development source of truth. The draft documents
 - [MILESTONE_0_BOOTSTRAP.md](MILESTONE_0_BOOTSTRAP.md): first scaffold and verification target.
 - [MILESTONE_5_ACCEPTANCE_AUDIT.md](MILESTONE_5_ACCEPTANCE_AUDIT.md): trading watch and dry-run acceptance evidence.
 - [MILESTONE_6_ACCEPTANCE_AUDIT.md](MILESTONE_6_ACCEPTANCE_AUDIT.md): pilot real trading gate acceptance evidence.
+- [PROJECT_STATUS_AUDIT.md](PROJECT_STATUS_AUDIT.md): current objective status and handoff evidence.
 - [QUALITY_GATES.md](QUALITY_GATES.md): TDD, verification, and release gates.
 
 ## Current Development Focus

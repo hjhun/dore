@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M6, Pilot Real Trading Preparation
-- Current task: M6 accepted for pre-broker scope; waiting for broker/API details for connector planning
+- Current task: pre-broker objective audited; waiting for broker/API details for connector planning
 
 ## Milestone Progress
 
@@ -99,6 +99,7 @@ Update it whenever development state changes.
 - [x] M6 approval control route records audit events.
 - [x] M6 kill-switch control route persists across daemon restarts.
 - [x] M6 acceptance audit documented.
+- [x] Project status audit documented for current pre-broker objective.
 
 ## M0 Checklist
 
@@ -379,6 +380,12 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M6 acceptance audit.
 - 2026-06-22: Docs relative link check passed after M6 acceptance audit docs update.
 - 2026-06-22: Changed-file secret-like scan found no plaintext secret values after M6 acceptance audit.
+- 2026-06-22: Project status audit documented in `docs/plan/PROJECT_STATUS_AUDIT.md`.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after project status audit, 15 files and 88 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after project status audit.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after project status audit.
+- 2026-06-22: Docs relative link check passed after project status audit docs update.
+- 2026-06-22: Changed-file and audit-file secret-like scan found no plaintext secret values after project status audit.
 
 ## Known Constraints
 
