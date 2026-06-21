@@ -63,6 +63,8 @@ Update it whenever development state changes.
 - [x] M4 review summary generator implemented.
 - [x] M4 requirement/design/change-plan draft persistence implemented.
 - [x] M4 engineering intake CLI entrypoint implemented.
+- [x] M4 engineering intake daemon route implemented.
+- [x] M4 review summary can be logged as task completion event.
 
 ## M0 Checklist
 
@@ -145,6 +147,8 @@ Update it whenever development state changes.
 - [x] Review summary generator exists.
 - [x] Requirement/design/change-plan drafts can be persisted under `memory/operations/engineering`.
 - [x] `pnpm engineering:intake` CLI entrypoint exists.
+- [x] `POST /engineering/intake` daemon route exists.
+- [x] Review summary outcomes can be recorded in append-only task logs.
 - [ ] Small repo change can be planned, implemented, tested, and logged through daemon/task logs.
 
 ## Verification Log
@@ -203,6 +207,10 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 review summary, persistence, and CLI work.
 - 2026-06-22: `DORE_MEMORY_ROOT=/tmp/dore-engineering-cli-test DORE_NOW=2026-06-22T00:00:00.000Z npx --yes pnpm@11.8.0 engineering:intake "Add review summary CLI"` wrote requirements, technical design, change plan, intake JSON, and event JSONL.
 - 2026-06-22: M4 review summary, draft persistence, and CLI entrypoint pushed to `origin/codex/add-agent-development-guide` at commit `f8e723c`.
+- 2026-06-22: M4 daemon route and review task log tests added; TDD red phase confirmed for missing `POST /engineering/intake` and `appendReviewSummaryEvent`.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 14 files and 47 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 daemon route and review task log work.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 daemon route and review task log work.
 
 ## Known Constraints
 
@@ -215,6 +223,6 @@ Update it whenever development state changes.
 
 Start M4 Development Agent MVP:
 
-1. Add daemon route or task wrapper for engineering intake.
-2. Add execution workflow that records implementation/test outcomes against the task log.
-3. Connect review summaries to the generated intake artifacts.
+1. Add execution workflow that records implementation/test outcomes against the task log.
+2. Connect review summaries to the generated intake artifacts.
+3. Expose M4 task status in daemon `/status` or desktop dashboard.

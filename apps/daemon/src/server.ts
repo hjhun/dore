@@ -1,4 +1,7 @@
 import Fastify from "fastify";
+import { resolve } from "node:path";
+import type { ExecFileResult, PackageJsonLike } from "../../../packages/engineering/src/index.js";
+import { runEngineeringIntake } from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
 import { createTelegramAdapterStatus } from "../../../packages/telegram/src/index.js";
 
@@ -6,6 +9,10 @@ export interface DaemonAppOptions {
   startedAt?: Date;
   configLoaded?: boolean;
   memoryReady?: boolean;
+  memoryRoot?: string;
+  projectRoot?: string;
+  packageJson?: PackageJsonLike;
+  engineeringExecFile?: (command: string, args: string[]) => Promise<ExecFileResult>;
 }
 
 export function createDaemonApp(options: DaemonAppOptions = {}) {
@@ -65,6 +72,38 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
         }
       }
     };
+  });
+
+  app.post("/engineering/intake", async (request, reply) => {
+    const payload = request.body as { idea?: unknown; requested_by?: unknown; now?: unknown } | null;
+    const idea = typeof payload?.idea === "string" ? payload.idea.trim() : "";
+    if (!idea) {
+      return reply.code(400).send({
+        error: "idea_required"
+      });
+    }
+
+    const result = await runEngineeringIntake({
+      idea,
+      requestedBy: typeof payload?.requested_by === "string" && payload.requested_by.trim() ? payload.requested_by.trim() : "hjhun",
+      now: typeof payload?.now === "string" && payload.now.trim() ? payload.now.trim() : new Date().toISOString(),
+      memoryRoot: resolve(options.memoryRoot ?? process.env.DORE_MEMORY_ROOT ?? "memory"),
+      projectRoot: resolve(options.projectRoot ?? process.env.DORE_PROJECT_ROOT ?? "."),
+      packageJson: options.packageJson,
+      execFile: options.engineeringExecFile
+    });
+
+    return reply.code(201).send({
+      task_id: result.intake.id,
+      status: result.intake.executionRecord.status,
+      drafts: {
+        requirements: result.drafts.requirementPath,
+        technical_design: result.drafts.technicalDesignPath,
+        change_plan: result.drafts.changePlanPath,
+        intake_json: result.drafts.intakeJsonPath
+      },
+      event_log: result.eventLogPath
+    });
   });
 
   return app;

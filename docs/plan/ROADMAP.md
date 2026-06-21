@@ -149,7 +149,9 @@ Status:
 - Requirement, technical design, and change-plan drafts can be persisted under `memory/operations/engineering`.
 - Review summaries can classify verification failures and residual repo risks.
 - `pnpm engineering:intake` provides a local CLI entrypoint for generating drafts and event logs.
-- Remaining work is daemon route/task wrapper integration and recording implementation/test outcomes against task logs.
+- `POST /engineering/intake` provides a daemon task wrapper for generating drafts and event logs.
+- Review summary outcomes can be recorded as append-only task completion events.
+- Remaining work is recording implementation/test outcomes against task logs and exposing engineering task status in daemon/dashboard views.
 
 Deliverables:
 

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  appendReviewSummaryEvent,
   appendProjectIntakeEvent,
   createProjectIntake,
   createReviewSummary,
@@ -244,5 +245,45 @@ describe("engineering project intake", () => {
     expect(result.intake.changePlan.steps[0]).toContain("Repo branch feature/m4");
     expect(await readFile(result.drafts.requirementPath, "utf8")).toContain("Add daemon engineering intake command");
     expect(await readFile(result.eventLogPath, "utf8")).toContain("Engineering intake planned");
+  });
+
+  it("logs review summaries as task completion events", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-"));
+    const eventLogPath = join(memoryRoot, "logs", "events", "engineering.jsonl");
+    const intake = createProjectIntake({
+      idea: "Record review summary",
+      requestedBy: "hjhun",
+      now: "2026-06-22T00:00:00.000Z"
+    });
+    const summary = createReviewSummary({
+      intake,
+      repo: {
+        branch: "feature/m4",
+        dirty: false,
+        changedFiles: []
+      },
+      executions: [
+        createTestExecutionRecord({
+          command: "pnpm test",
+          exitCode: 0,
+          startedAt: "2026-06-22T00:00:00.000Z",
+          completedAt: "2026-06-22T00:00:01.000Z",
+          output: "ok"
+        })
+      ]
+    });
+
+    await appendReviewSummaryEvent(eventLogPath, intake, summary);
+
+    const [line] = (await readFile(eventLogPath, "utf8")).trim().split("\n");
+    const record = JSON.parse(line);
+    expect(record).toMatchObject({
+      actor: "dore",
+      event_type: "task_completed",
+      entity_type: "task",
+      entity_id: intake.id,
+      summary: "Engineering review summary: ready_for_review"
+    });
+    expect(record.verification_passed).toEqual(["pnpm test"]);
   });
 });

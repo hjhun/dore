@@ -264,6 +264,29 @@ export async function appendProjectIntakeEvent(eventLogPath: string, intake: Pro
   });
 }
 
+export async function appendReviewSummaryEvent(
+  eventLogPath: string,
+  intake: ProjectIntake,
+  review: ReviewSummary
+): Promise<void> {
+  await appendEvent(eventLogPath, {
+    id: `event_${intake.id}_review`,
+    time: intake.executionRecord.generatedAt,
+    actor: "dore",
+    event_type: "task_completed",
+    entity_type: "task",
+    entity_id: intake.id,
+    summary: `Engineering review summary: ${review.status}`,
+    risk_level: "write",
+    refs: ["engineering_review_summary"],
+    review_status: review.status,
+    findings: review.findings,
+    residual_risks: review.residualRisks,
+    verification_passed: review.verification.passed,
+    verification_failed: review.verification.failed
+  });
+}
+
 export async function persistProjectIntakeDrafts(
   memoryRoot: string,
   intake: ProjectIntake
