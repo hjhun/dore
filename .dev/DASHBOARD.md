@@ -27,7 +27,7 @@ Update it whenever development state changes.
 - [x] `doctor` command implemented and manually verified.
 - [x] M0 `pnpm test` passes.
 - [x] M0 `pnpm build` passes.
-- [ ] M0 branch pushed.
+- [x] M0 branch pushed.
 
 ## M0 Checklist
 
@@ -55,6 +55,7 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
 - 2026-06-21: `npx --yes pnpm@11.8.0 doctor` passed and reported missing credentials without exposing secrets.
 - 2026-06-21: daemon `/status` returned app, provider, Telegram, and trading status; endpoint is also covered by inject test.
+- 2026-06-21: M0 scaffold pushed to `origin/codex/add-agent-development-guide` at commit `9c6018c`.
 
 ## Known Constraints
 
@@ -65,11 +66,9 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Finish M0 publishing:
+Start M1 manual daily briefing:
 
-1. Inspect diff.
-2. Commit the plan and scaffold.
-3. Push the branch.
-4. Mark M0 branch pushed.
-
-Then start M1 manual daily briefing.
+1. Add failing tests for briefing Markdown/JSON output.
+2. Implement deterministic fallback briefing without LLM credentials.
+3. Record briefing usage metadata.
+4. Write outputs under `memory/logs/daily/`.
