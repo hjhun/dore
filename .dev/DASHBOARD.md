@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M4, Development Agent MVP
-- Current task: connect M4 engineering intake to executable workflows and task logs
+- Current task: controlled command executor complete; next is controlled file-edit executor
 
 ## Milestone Progress
 
@@ -69,6 +69,10 @@ Update it whenever development state changes.
 - [x] M4 engineering task status is exposed through daemon `/status`.
 - [x] M4 engineering task status is visible in the desktop Dashboard.
 - [x] M4 engineering task history persists across daemon restarts.
+- [x] M4 controlled command executor skeleton implemented.
+- [x] M4 executor command allowlist implemented.
+- [x] M4 executor output redaction implemented.
+- [x] M4 executor daemon route logs outcomes against engineering tasks.
 
 ## M0 Checklist
 
@@ -157,6 +161,8 @@ Update it whenever development state changes.
 - [x] Engineering task status is exposed in daemon `/status`.
 - [x] Engineering task status is visible in the desktop Dashboard.
 - [x] Engineering task history is restored from `memory/operations/engineering` and event logs.
+- [x] Allowed verification commands can run through the engineering task executor route.
+- [x] Executor output is redacted before being written to task logs.
 - [ ] Small repo change can be executed from the agent workflow and fully logged through daemon/task logs.
 
 ## Verification Log
@@ -230,6 +236,14 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 engineering task history persistence.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 engineering task history persistence.
 - 2026-06-22: M4 engineering task history persistence pushed to `origin/codex/add-agent-development-guide` at commit `c02495c`.
+- 2026-06-22: M4 controlled executor tests added; TDD red phase confirmed for missing `executeAllowedCommand` and `POST /engineering/tasks/:id/run-command`.
+- 2026-06-22: M4 executor failure-output test added for nonzero command output and redaction.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts` passed, 14 files and 55 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 controlled command executor work.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 14 files and 55 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 controlled command executor work.
+- 2026-06-22: Docs relative link check passed after M4 controlled executor docs update.
+- 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 
 ## Known Constraints
 
@@ -242,6 +256,6 @@ Update it whenever development state changes.
 
 Start M4 Development Agent MVP:
 
-1. Add a controlled implementation executor skeleton for small repo changes.
+1. Add a controlled file-edit executor for small repo changes.
 2. Connect review summaries to the generated intake artifacts.
-3. Add guardrails for executor allowed commands and no-secret output capture.
+3. Keep executor command allowlists narrow as new workflows are added.

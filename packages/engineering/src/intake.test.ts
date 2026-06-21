@@ -10,6 +10,7 @@ import {
   createReviewSummary,
   createTestExecutionRecord,
   detectVerificationCommands,
+  executeAllowedCommand,
   inspectRepository,
   persistProjectIntakeDrafts,
   runEngineeringIntake
@@ -317,5 +318,62 @@ describe("engineering project intake", () => {
     });
     expect(record.exit_code).toBe(0);
     expect(record.output_summary).toBe("ok");
+  });
+
+  it("executes allowed verification commands and redacts secret-like output", async () => {
+    const openAiKeyName = ["OPENAI", "API", "KEY"].join("_");
+    const execution = await executeAllowedCommand({
+      command: "pnpm test",
+      projectRoot: "/workspace/dore",
+      now: "2026-06-22T00:00:00.000Z",
+      execFile: async (command, args) => {
+        expect(command).toBe("pnpm");
+        expect(args).toEqual(["test"]);
+        return {
+          stdout: `ok\n${openAiKeyName}=abc123`,
+          stderr: ""
+        };
+      }
+    });
+
+    expect(execution.status).toBe("passed");
+    expect(execution.outputSummary).toContain(`${openAiKeyName}=<redacted>`);
+    expect(execution.outputSummary).not.toContain("abc123");
+  });
+
+  it("blocks commands outside the executor allowlist", async () => {
+    await expect(
+      executeAllowedCommand({
+        command: "rm -rf memory",
+        projectRoot: "/workspace/dore",
+        now: "2026-06-22T00:00:00.000Z",
+        execFile: async () => ({ stdout: "", stderr: "" })
+      })
+    ).rejects.toThrow("Command is not allowed for engineering executor: rm -rf memory");
+  });
+
+  it("records failed allowed command output without leaking secret-like values", async () => {
+    const tokenName = ["CUSTOM", "TOKEN"].join("_");
+    const failure = new Error("Command failed");
+    Object.assign(failure, {
+      code: 2,
+      stdout: "partial output",
+      stderr: `${tokenName}=token-value`
+    });
+
+    const execution = await executeAllowedCommand({
+      command: "pnpm build",
+      projectRoot: "/workspace/dore",
+      now: "2026-06-22T00:00:00.000Z",
+      execFile: async () => {
+        throw failure;
+      }
+    });
+
+    expect(execution.status).toBe("failed");
+    expect(execution.exitCode).toBe(2);
+    expect(execution.outputSummary).toContain("partial output");
+    expect(execution.outputSummary).toContain(`${tokenName}=<redacted>`);
+    expect(execution.outputSummary).not.toContain("token-value");
   });
 });

@@ -154,7 +154,8 @@ Status:
 - Test execution outcomes can be recorded against engineering tasks.
 - Engineering task status is exposed through daemon `/status` and the desktop Dashboard.
 - Engineering task history is restored from persisted intake artifacts and append-only event logs across daemon restarts.
-- Remaining work is a controlled implementation executor skeleton with command guardrails and no-secret output capture.
+- A controlled command executor skeleton can run allowed verification commands and log redacted outcomes against engineering tasks.
+- Remaining work is a controlled file-edit executor for small repo changes and linking review summaries back to generated intake artifacts.
 
 Deliverables:
 
@@ -163,11 +164,13 @@ Deliverables:
 - technical design workflow.
 - repo inspection workflow.
 - test detection and execution record.
+- controlled verification command executor.
 
 Acceptance:
 
 - a user idea can produce a requirement draft and technical design draft.
 - a small repo change can be planned, implemented, tested, and logged.
+- executor command output is redacted before it reaches append-only task logs.
 
 ### M5: Trading Watch and Dry-run
 

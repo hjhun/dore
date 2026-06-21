@@ -2,7 +2,12 @@ import Fastify from "fastify";
 import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ExecFileResult, PackageJsonLike, ProjectIntake } from "../../../packages/engineering/src/index.js";
-import { appendTestExecutionEvent, createTestExecutionRecord, runEngineeringIntake } from "../../../packages/engineering/src/index.js";
+import {
+  appendTestExecutionEvent,
+  createTestExecutionRecord,
+  executeAllowedCommand,
+  runEngineeringIntake
+} from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
 import { createTelegramAdapterStatus } from "../../../packages/telegram/src/index.js";
 
@@ -14,6 +19,7 @@ export interface DaemonAppOptions {
   projectRoot?: string;
   packageJson?: PackageJsonLike;
   engineeringExecFile?: (command: string, args: string[]) => Promise<ExecFileResult>;
+  engineeringCommandExecFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
 }
 
 export function createDaemonApp(options: DaemonAppOptions = {}) {
@@ -187,7 +193,48 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
     });
   });
 
+  app.post("/engineering/tasks/:id/run-command", async (request, reply) => {
+    const payload = request.body as { command?: unknown; now?: unknown } | null;
+    const command = typeof payload?.command === "string" && payload.command.trim() ? payload.command.trim() : "";
+    if (!isAllowedEngineeringCommand(command)) {
+      return reply.code(400).send({
+        error: "command_not_allowed"
+      });
+    }
+
+    const params = request.params as { id?: string };
+    const task = params.id ? engineeringTasks.get(params.id) : undefined;
+    if (!task) {
+      return reply.code(404).send({
+        error: "task_not_found"
+      });
+    }
+
+    const execution = await executeAllowedCommand({
+      command,
+      projectRoot,
+      now: typeof payload?.now === "string" && payload.now.trim() ? payload.now.trim() : new Date().toISOString(),
+      execFile: options.engineeringCommandExecFile
+    });
+    await appendTestExecutionEvent(task.eventLogPath, task.intake, execution);
+    task.status = execution.status === "passed" ? "completed" : "failed";
+    task.lastCommand = execution.command;
+
+    return reply.code(201).send({
+      task_id: task.intake.id,
+      task_status: task.status,
+      execution,
+      event_log: task.eventLogPath
+    });
+  });
+
   return app;
+}
+
+function isAllowedEngineeringCommand(command: string): boolean {
+  return ["pnpm test", "pnpm build", "pnpm build:desktop", "pnpm lint", "pnpm doctor"].includes(
+    command.trim().replace(/\s+/g, " ")
+  );
 }
 
 async function restoreEngineeringTasks(

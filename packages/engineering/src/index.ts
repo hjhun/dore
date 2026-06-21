@@ -101,6 +101,7 @@ export interface ReviewSummary {
 
 export interface ExecFileResult {
   stdout: string;
+  stderr?: string;
 }
 
 export interface RepoInspectionOptions {
@@ -131,6 +132,13 @@ export interface RunEngineeringIntakeResult {
   intake: ProjectIntake;
   drafts: PersistProjectIntakeDraftsResult;
   eventLogPath: string;
+}
+
+export interface ExecuteAllowedCommandInput {
+  command: string;
+  projectRoot: string;
+  now: string;
+  execFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
 }
 
 const COMMAND_ORDER: VerificationCommand["kind"][] = ["test", "build", "desktop_build", "lint", "doctor"];
@@ -202,6 +210,35 @@ export function createTestExecutionRecord(input: TestExecutionRecordInput): Test
     durationMs,
     outputSummary: sanitizeExecutionOutput(input.output)
   };
+}
+
+export async function executeAllowedCommand(input: ExecuteAllowedCommandInput): Promise<TestExecutionRecord> {
+  const parsed = parseAllowedCommand(input.command);
+  if (!parsed) {
+    throw new Error(`Command is not allowed for engineering executor: ${input.command}`);
+  }
+
+  const execFile = input.execFile ?? defaultExecFile;
+  const startedAt = input.now;
+  try {
+    const result = await execFile(parsed.command, parsed.args, { cwd: input.projectRoot });
+    return createTestExecutionRecord({
+      command: input.command,
+      exitCode: 0,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      output: [result.stdout, result.stderr ?? ""].filter(Boolean).join("\n")
+    });
+  } catch (error) {
+    const failure = normalizeExecFailure(error);
+    return createTestExecutionRecord({
+      command: input.command,
+      exitCode: failure.exitCode,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      output: failure.output
+    });
+  }
 }
 
 export function createReviewSummary(input: ReviewSummaryInput): ReviewSummary {
@@ -488,11 +525,39 @@ function sanitizePersistedJson(value: unknown): string {
   return sanitizeExecutionOutput(JSON.stringify(value, null, 2));
 }
 
-async function defaultExecFile(command: string, args: string[]): Promise<ExecFileResult> {
-  const { stdout } = await execFileAsync(command, args);
+function normalizeExecFailure(error: unknown): { exitCode: number; output: string } {
+  const fallbackMessage = error instanceof Error ? error.message : String(error);
+  const record = typeof error === "object" && error !== null ? (error as Record<string, unknown>) : {};
+  const exitCode = typeof record.code === "number" ? record.code : 1;
+  const output = [record.stdout, record.stderr, fallbackMessage]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join("\n");
+
   return {
-    stdout: stdout.toString()
+    exitCode,
+    output
   };
+}
+
+async function defaultExecFile(command: string, args: string[], options?: { cwd?: string }): Promise<ExecFileResult> {
+  const { stdout, stderr } = await execFileAsync(command, args, options);
+  return {
+    stdout: stdout.toString(),
+    stderr: stderr.toString()
+  };
+}
+
+function parseAllowedCommand(command: string): { command: string; args: string[] } | null {
+  const normalized = command.trim().replace(/\s+/g, " ");
+  const allowed: Record<string, string[]> = {
+    "pnpm test": ["test"],
+    "pnpm build": ["build"],
+    "pnpm build:desktop": ["build:desktop"],
+    "pnpm lint": ["lint"],
+    "pnpm doctor": ["doctor"]
+  };
+  const args = allowed[normalized];
+  return args ? { command: "pnpm", args } : null;
 }
 
 function parseGitStatusFiles(status: string): string[] {

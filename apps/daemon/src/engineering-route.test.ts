@@ -181,4 +181,69 @@ describe("daemon engineering routes", () => {
       })
     );
   });
+
+  it("runs allowed engineering task commands through the executor route", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot: "/workspace/dore",
+      engineeringExecFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/m4\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      },
+      engineeringCommandExecFile: async (command, args) => {
+        expect(command).toBe("pnpm");
+        expect(args).toEqual(["test"]);
+        return {
+          stdout: "ok",
+          stderr: ""
+        };
+      }
+    });
+
+    const intakeResponse = await app.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Run executor command",
+        now: "2026-06-22T00:00:00.000Z"
+      }
+    });
+
+    const runResponse = await app.inject({
+      method: "POST",
+      url: `/engineering/tasks/${intakeResponse.json().task_id}/run-command`,
+      payload: {
+        command: "pnpm test",
+        now: "2026-06-22T00:00:00.000Z"
+      }
+    });
+
+    expect(runResponse.statusCode).toBe(201);
+    expect(runResponse.json().execution.status).toBe("passed");
+    expect(runResponse.json().task_status).toBe("completed");
+  });
+
+  it("rejects disallowed engineering task commands", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const app = createDaemonApp({
+      memoryRoot
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/engineering/tasks/missing/run-command",
+      payload: {
+        command: "rm -rf memory"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("command_not_allowed");
+  });
 });
