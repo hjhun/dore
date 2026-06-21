@@ -153,7 +153,8 @@ Status:
 - Review summary outcomes can be recorded as append-only task completion events.
 - Test execution outcomes can be recorded against engineering tasks.
 - Engineering task status is exposed through daemon `/status` and the desktop Dashboard.
-- Remaining work is a controlled implementation executor skeleton and persistent engineering task history.
+- Engineering task history is restored from persisted intake artifacts and append-only event logs across daemon restarts.
+- Remaining work is a controlled implementation executor skeleton with command guardrails and no-secret output capture.
 
 Deliverables:
 

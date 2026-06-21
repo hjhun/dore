@@ -1,5 +1,6 @@
 import Fastify from "fastify";
-import { resolve } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import type { ExecFileResult, PackageJsonLike, ProjectIntake } from "../../../packages/engineering/src/index.js";
 import { appendTestExecutionEvent, createTestExecutionRecord, runEngineeringIntake } from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
@@ -18,6 +19,9 @@ export interface DaemonAppOptions {
 export function createDaemonApp(options: DaemonAppOptions = {}) {
   const startedAt = options.startedAt ?? new Date();
   const app = Fastify({ logger: false });
+  const memoryRoot = resolve(options.memoryRoot ?? process.env.DORE_MEMORY_ROOT ?? "memory");
+  const projectRoot = resolve(options.projectRoot ?? process.env.DORE_PROJECT_ROOT ?? ".");
+  let engineeringHistoryLoaded = false;
   const engineeringTasks = new Map<
     string,
     {
@@ -28,7 +32,20 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
     }
   >();
 
+  async function ensureEngineeringHistoryLoaded(): Promise<void> {
+    if (engineeringHistoryLoaded) {
+      return;
+    }
+    engineeringHistoryLoaded = true;
+    await restoreEngineeringTasks(memoryRoot, engineeringTasks);
+  }
+
+  app.addHook("onReady", async () => {
+    await ensureEngineeringHistoryLoaded();
+  });
+
   app.get("/status", async () => {
+    await ensureEngineeringHistoryLoaded();
     const uptime_ms = Date.now() - startedAt.getTime();
     const scheduler = new InMemoryScheduleRegistry();
     createDailyBriefingJob(scheduler, {
@@ -104,8 +121,8 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       idea,
       requestedBy: typeof payload?.requested_by === "string" && payload.requested_by.trim() ? payload.requested_by.trim() : "hjhun",
       now: typeof payload?.now === "string" && payload.now.trim() ? payload.now.trim() : new Date().toISOString(),
-      memoryRoot: resolve(options.memoryRoot ?? process.env.DORE_MEMORY_ROOT ?? "memory"),
-      projectRoot: resolve(options.projectRoot ?? process.env.DORE_PROJECT_ROOT ?? "."),
+      memoryRoot,
+      projectRoot,
       packageJson: options.packageJson,
       execFile: options.engineeringExecFile
     });
@@ -171,4 +188,70 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
   });
 
   return app;
+}
+
+async function restoreEngineeringTasks(
+  memoryRoot: string,
+  engineeringTasks: Map<
+    string,
+    {
+      intake: ProjectIntake;
+      status: "planned" | "completed" | "failed";
+      eventLogPath: string;
+      lastCommand?: string;
+    }
+  >
+): Promise<void> {
+  const engineeringRoot = join(memoryRoot, "operations", "engineering");
+  const eventLogPath = join(memoryRoot, "logs", "events", "engineering.jsonl");
+
+  let entries: string[];
+  try {
+    entries = await readdir(engineeringRoot);
+  } catch {
+    return;
+  }
+
+  const events = await readEngineeringEvents(eventLogPath);
+  for (const entry of entries) {
+    try {
+      const intake = JSON.parse(await readFile(join(engineeringRoot, entry, "intake.json"), "utf8")) as ProjectIntake;
+      const relatedEvents = events.filter((event) => event.entity_id === intake.id);
+      const executionEvent = findLastEvent(relatedEvents, (event) => typeof event.command === "string");
+      const failedExecution = findLastEvent(relatedEvents, (event) => event.status === "failed");
+      const completedEvent = findLastEvent(relatedEvents, (event) => event.event_type === "task_completed");
+      engineeringTasks.set(intake.id, {
+        intake,
+        status: failedExecution ? "failed" : completedEvent ? "completed" : "planned",
+        eventLogPath,
+        lastCommand: typeof executionEvent?.command === "string" ? executionEvent.command : undefined
+      });
+    } catch {
+      continue;
+    }
+  }
+}
+
+function findLastEvent(
+  events: Array<Record<string, unknown>>,
+  predicate: (event: Record<string, unknown>) => boolean
+): Record<string, unknown> | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event && predicate(event)) {
+      return event;
+    }
+  }
+  return undefined;
+}
+
+async function readEngineeringEvents(eventLogPath: string): Promise<Array<Record<string, unknown>>> {
+  try {
+    return (await readFile(eventLogPath, "utf8"))
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+  } catch {
+    return [];
+  }
 }

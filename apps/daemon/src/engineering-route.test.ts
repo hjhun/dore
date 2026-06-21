@@ -126,4 +126,59 @@ describe("daemon engineering routes", () => {
       })
     );
   });
+
+  it("restores engineering task history from memory after daemon restart", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const firstApp = createDaemonApp({
+      memoryRoot,
+      projectRoot: "/workspace/dore",
+      engineeringExecFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/m4\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      }
+    });
+
+    const intakeResponse = await firstApp.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Restore task history",
+        now: "2026-06-22T00:00:00.000Z"
+      }
+    });
+
+    await firstApp.inject({
+      method: "POST",
+      url: `/engineering/tasks/${intakeResponse.json().task_id}/executions`,
+      payload: {
+        command: "pnpm test",
+        exit_code: 0,
+        started_at: "2026-06-22T00:00:00.000Z",
+        completed_at: "2026-06-22T00:00:02.000Z",
+        output: "ok"
+      }
+    });
+
+    const restartedApp = createDaemonApp({
+      memoryRoot
+    });
+    const statusResponse = await restartedApp.inject({
+      method: "GET",
+      url: "/status"
+    });
+
+    expect(statusResponse.json().engineering.tasks).toContainEqual(
+      expect.objectContaining({
+        id: "intake_2026_06_22_restore_task_history",
+        title: "Restore task history",
+        status: "completed",
+        last_command: "pnpm test"
+      })
+    );
+  });
 });

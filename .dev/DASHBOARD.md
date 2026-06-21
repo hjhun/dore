@@ -68,6 +68,7 @@ Update it whenever development state changes.
 - [x] M4 test execution outcomes can be logged against engineering tasks.
 - [x] M4 engineering task status is exposed through daemon `/status`.
 - [x] M4 engineering task status is visible in the desktop Dashboard.
+- [x] M4 engineering task history persists across daemon restarts.
 
 ## M0 Checklist
 
@@ -155,6 +156,7 @@ Update it whenever development state changes.
 - [x] Test execution outcomes can be recorded in append-only task logs.
 - [x] Engineering task status is exposed in daemon `/status`.
 - [x] Engineering task status is visible in the desktop Dashboard.
+- [x] Engineering task history is restored from `memory/operations/engineering` and event logs.
 - [ ] Small repo change can be executed from the agent workflow and fully logged through daemon/task logs.
 
 ## Verification Log
@@ -223,6 +225,10 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 execution outcome/status/dashboard work.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 execution outcome/status/dashboard work.
 - 2026-06-22: M4 execution outcomes and engineering task status pushed to `origin/codex/add-agent-development-guide` at commit `3bc1549`.
+- 2026-06-22: M4 engineering task history persistence test added; TDD red phase confirmed that a restarted daemon returned no prior engineering tasks.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 14 files and 50 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 engineering task history persistence.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 engineering task history persistence.
 
 ## Known Constraints
 
@@ -237,4 +243,4 @@ Start M4 Development Agent MVP:
 
 1. Add a controlled implementation executor skeleton for small repo changes.
 2. Connect review summaries to the generated intake artifacts.
-3. Persist engineering task history across daemon restarts.
+3. Add guardrails for executor allowed commands and no-secret output capture.
