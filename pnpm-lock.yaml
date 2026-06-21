@@ -70,6 +70,8 @@ importers:
 
   packages/core: {}
 
+  packages/engineering: {}
+
   packages/memory: {}
 
   packages/model-gateway: {}

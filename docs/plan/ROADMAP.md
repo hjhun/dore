@@ -140,6 +140,12 @@ Goal:
 
 - Turn user ideas into product/development artifacts and small verified code changes.
 
+Status:
+
+- `packages/engineering` provides a deterministic project intake workflow.
+- Project intake can generate requirement and technical design drafts, a change plan, verification command detection, and secret-redacted test execution records.
+- Remaining work is real repo inspection, daemon/task log integration, and review summary generation.
+
 Deliverables:
 
 - project intake workflow.

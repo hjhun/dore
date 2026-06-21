@@ -52,6 +52,12 @@ Update it whenever development state changes.
 - [x] M3 Settings status implemented.
 - [x] M3 approval decisions implemented.
 - [x] M3 branch pushed.
+- [x] M4 deterministic engineering intake package created.
+- [x] M4 project intake workflow implemented.
+- [x] M4 requirement draft workflow implemented.
+- [x] M4 technical design draft workflow implemented.
+- [x] M4 test command detection implemented.
+- [x] M4 test execution record implemented with secret-like output redaction.
 
 ## M0 Checklist
 
@@ -123,12 +129,14 @@ Update it whenever development state changes.
 
 ## M4 Checklist
 
-- [ ] Project intake workflow exists.
-- [ ] Requirement draft workflow exists.
-- [ ] Technical design workflow exists.
+- [x] `packages/engineering` exists.
+- [x] Project intake workflow exists.
+- [x] Requirement draft workflow exists.
+- [x] Technical design workflow exists.
 - [ ] Repo inspection workflow exists.
-- [ ] Test detection and execution record exists.
-- [ ] Small repo change can be planned, implemented, tested, and logged.
+- [x] Change plan generator exists.
+- [x] Test detection and execution record exists.
+- [ ] Small repo change can be planned, implemented, tested, and logged through daemon/task logs.
 
 ## Verification Log
 
@@ -171,6 +179,9 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after approval decision implementation.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed after approval decision implementation.
 - 2026-06-21: M3 approval decisions pushed to `origin/codex/add-agent-development-guide` at commit `dcb4f6b`.
+- 2026-06-21: M4 engineering intake tests added; TDD red phase confirmed for missing `packages/engineering/src/index.ts`.
+- 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 12 files and 35 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after M4 intake foundation.
 
 ## Known Constraints
 
@@ -183,7 +194,6 @@ Update it whenever development state changes.
 
 Start M4 Development Agent MVP:
 
-1. Add project intake workflow tests and implementation.
-2. Add requirement draft workflow.
-3. Add technical design workflow.
-4. Record test detection and execution metadata.
+1. Add repo inspection workflow that reads branch, dirty state, and changed files.
+2. Connect engineering intake output to daemon/task or memory logs.
+3. Add review summary generator.
