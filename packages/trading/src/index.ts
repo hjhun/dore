@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   BrokerCapabilitySchema,
@@ -43,6 +43,7 @@ export interface CreateTradingStatusInput {
   realTradingEnabled: boolean;
   brokers?: BrokerConfigMap;
   watchlist?: WatchlistInput[];
+  dryRunJournal?: DryRunJournalSummary;
 }
 
 export interface TradingStatus {
@@ -55,6 +56,7 @@ export interface TradingStatus {
     items: WatchlistItem[];
   };
   blocked_actions: string[];
+  dry_run_journal?: DryRunJournalSummary;
 }
 
 export interface RiskPolicy {
@@ -121,6 +123,45 @@ export interface AppendDryRunJournalEntryResult {
   entry: DryRunJournalEntry;
 }
 
+export interface MarketDataQuoteInput {
+  market: Market;
+  symbol: string;
+}
+
+export interface MarketDataQuote {
+  market: Market;
+  symbol: string;
+  price: number;
+  currency: "KRW" | "USD";
+  timestamp: string;
+  source_refs: string[];
+}
+
+export interface MarketDataAdapter {
+  name: string;
+  getQuote(input: MarketDataQuoteInput): Promise<MarketDataQuote | null>;
+}
+
+export interface CreateStaticMarketDataAdapterInput {
+  name: string;
+  quotes: Array<{
+    market: Market;
+    symbol: string;
+    price: number;
+    currency: "KRW" | "USD";
+    timestamp: string;
+    sourceRefs: string[];
+  }>;
+}
+
+export interface DryRunJournalSummary {
+  month: string;
+  entries: number;
+  passed: number;
+  blocked: number;
+  latest_signal_id?: string;
+}
+
 const BROKER_ORDER: BrokerId[] = ["toss", "shinhan", "samsung"];
 const DEFAULT_BROKERS: Record<BrokerId, BrokerConfig> = {
   toss: {
@@ -185,7 +226,35 @@ export function createTradingStatus(input: CreateTradingStatusInput): TradingSta
       count: watchlist.items.length,
       items: watchlist.items
     },
-    blocked_actions: input.realTradingEnabled ? [] : ["Real trading disabled."]
+    blocked_actions: input.realTradingEnabled ? [] : ["Real trading disabled."],
+    dry_run_journal: input.dryRunJournal
+  };
+}
+
+export function createStaticMarketDataAdapter(input: CreateStaticMarketDataAdapterInput): MarketDataAdapter {
+  const quotes = new Map(
+    input.quotes.map((quote) => {
+      const normalized = normalizeSymbol(quote.market, quote.symbol);
+      return [
+        `${quote.market}:${normalized}`,
+        {
+          market: quote.market,
+          symbol: normalized,
+          price: quote.price,
+          currency: quote.currency,
+          timestamp: quote.timestamp,
+          source_refs: quote.sourceRefs
+        }
+      ];
+    })
+  );
+
+  return {
+    name: input.name,
+    async getQuote(request) {
+      const symbol = normalizeSymbol(request.market, request.symbol);
+      return quotes.get(`${request.market}:${symbol}`) ?? null;
+    }
   };
 }
 
@@ -268,6 +337,31 @@ export async function appendDryRunJournalEntry(
   return {
     path,
     entry
+  };
+}
+
+export async function summarizeDryRunJournal(memoryRoot: string, month: string): Promise<DryRunJournalSummary> {
+  const path = join(memoryRoot, "logs", "trading", `${month}.jsonl`);
+  let lines: string[];
+  try {
+    lines = (await readFile(path, "utf8")).split("\n").filter(Boolean);
+  } catch {
+    return {
+      month,
+      entries: 0,
+      passed: 0,
+      blocked: 0
+    };
+  }
+
+  const entries = lines.map((line) => JSON.parse(line) as DryRunJournalEntry);
+  const latest = entries.at(-1);
+  return {
+    month,
+    entries: entries.length,
+    passed: entries.filter((entry) => entry.risk_check.status === "pass").length,
+    blocked: entries.filter((entry) => entry.risk_check.status === "blocked").length,
+    latest_signal_id: latest?.signal_id
   };
 }
 

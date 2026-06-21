@@ -191,7 +191,10 @@ Status:
 - Trading signals can be created through the runtime contract shape.
 - Deterministic risk checks block stale data, oversize orders, daily limit breaches, kill switch, closed market, and disabled real trading.
 - Dry-run journal entries can be appended under `memory/logs/trading/YYYY-MM.jsonl`.
-- Remaining work is market data adapter interfaces and daemon trading status summaries for dry-run journal history.
+- Static market data adapters provide a local interface for future broker/data-source connectors.
+- Daemon trading status includes dry-run journal summary for the current month.
+- Desktop Dashboard maps and renders dry-run journal summary from daemon status.
+- Remaining work is optional safe watchlist persistence and manual signal creation routes.
 
 Deliverables:
 

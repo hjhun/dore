@@ -45,6 +45,13 @@ describe("daemon status mapping", () => {
       trading: {
         enabled: true,
         real_trading_enabled: false,
+        dry_run_journal: {
+          month: "2026-06",
+          entries: 2,
+          passed: 1,
+          blocked: 1,
+          latest_signal_id: "signal_20260622_AAPL_status"
+        },
         brokers: {
           toss: "candidate",
           shinhan: "candidate",
@@ -69,6 +76,13 @@ describe("daemon status mapping", () => {
     expect(dashboard.telegram.adapterState).toBe("disabled");
     expect(dashboard.telegram.detail).toBe("missing_token");
     expect(dashboard.trading.realTradingEnabled).toBe(false);
+    expect(dashboard.trading.dryRunJournal).toEqual({
+      month: "2026-06",
+      entries: 2,
+      passed: 1,
+      blocked: 1,
+      latestSignalId: "signal_20260622_AAPL_status"
+    });
     expect(dashboard.settings.providers.OpenAI).toBe("configured");
     expect(dashboard.settings.providers.Claude).toBe("missing");
     expect(dashboard.settings.memory).toBe("ready");

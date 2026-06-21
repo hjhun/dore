@@ -21,6 +21,13 @@ export interface DashboardStatus {
   trading: {
     realTradingEnabled: boolean;
     brokers: Record<string, string>;
+    dryRunJournal?: {
+      month: string;
+      entries: number;
+      passed: number;
+      blocked: number;
+      latestSignalId?: string;
+    };
   };
   approvals: Array<{
     id: string;
@@ -73,6 +80,12 @@ export function createMockDashboardStatus(): DashboardStatus {
     },
     trading: {
       realTradingEnabled: false,
+      dryRunJournal: {
+        month: "2026-06",
+        entries: 0,
+        passed: 0,
+        blocked: 0
+      },
       brokers: {
         toss: "candidate",
         shinhan: "candidate",
@@ -174,6 +187,15 @@ export function Dashboard({ status }: { status: DashboardStatus }) {
 
         <StatusPanel title="Trading">
           <p>{tradingState}</p>
+          <p>Dry-run entries: {status.trading.dryRunJournal?.entries ?? 0}</p>
+          {status.trading.dryRunJournal ? (
+            <p>
+              Passed: {status.trading.dryRunJournal.passed} Blocked: {status.trading.dryRunJournal.blocked}
+            </p>
+          ) : null}
+          {status.trading.dryRunJournal?.latestSignalId ? (
+            <p>Latest signal: {status.trading.dryRunJournal.latestSignalId}</p>
+          ) : null}
           {Object.entries(status.trading.brokers).map(([broker, state]) => (
             <p key={broker}>
               {broker}: {state}

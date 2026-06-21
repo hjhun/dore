@@ -42,6 +42,13 @@ export interface DaemonStatusPayload {
     enabled: boolean;
     real_trading_enabled: boolean;
     brokers: Record<string, string>;
+    dry_run_journal?: {
+      month: string;
+      entries: number;
+      passed: number;
+      blocked: number;
+      latest_signal_id?: string;
+    };
   };
   engineering?: {
     tasks: Array<{
@@ -79,7 +86,16 @@ export function mapDaemonStatusToDashboard(payload: DaemonStatusPayload): Dashbo
     },
     trading: {
       realTradingEnabled: payload.trading.real_trading_enabled,
-      brokers: payload.trading.brokers
+      brokers: payload.trading.brokers,
+      dryRunJournal: payload.trading.dry_run_journal
+        ? {
+            month: payload.trading.dry_run_journal.month,
+            entries: payload.trading.dry_run_journal.entries,
+            passed: payload.trading.dry_run_journal.passed,
+            blocked: payload.trading.dry_run_journal.blocked,
+            latestSignalId: payload.trading.dry_run_journal.latest_signal_id
+          }
+        : undefined
     },
     approvals: [],
     logs: [],
@@ -135,6 +151,12 @@ export function createOfflineDashboardStatus(): DashboardStatus {
     },
     trading: {
       realTradingEnabled: false,
+      dryRunJournal: {
+        month: "offline",
+        entries: 0,
+        passed: 0,
+        blocked: 0
+      },
       brokers: {
         toss: "unknown",
         shinhan: "unknown",

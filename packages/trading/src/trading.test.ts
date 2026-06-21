@@ -6,11 +6,13 @@ import {
   appendDryRunJournalEntry,
   createBrokerCapabilityRegistry,
   createDryRunJournalEntry,
+  createStaticMarketDataAdapter,
   createTradingSignal,
   createTradingStatus,
   createWatchlistStore,
   ensureRealTradingBlocked,
-  runRiskCheck
+  runRiskCheck,
+  summarizeDryRunJournal
 } from "./index.js";
 
 describe("trading watch and dry-run foundations", () => {
@@ -225,6 +227,82 @@ describe("trading watch and dry-run foundations", () => {
         side: "buy",
         quantity: 1
       }
+    });
+  });
+
+  it("reads quotes through a static market data adapter interface", async () => {
+    const adapter = createStaticMarketDataAdapter({
+      name: "manual_fixture",
+      quotes: [
+        {
+          market: "us",
+          symbol: "aapl",
+          price: 100,
+          currency: "USD",
+          timestamp: "2026-06-22T09:00:00.000Z",
+          sourceRefs: ["manual"]
+        }
+      ]
+    });
+
+    await expect(adapter.getQuote({ market: "us", symbol: "AAPL" })).resolves.toMatchObject({
+      market: "us",
+      symbol: "AAPL",
+      price: 100,
+      currency: "USD",
+      timestamp: "2026-06-22T09:00:00.000Z",
+      source_refs: ["manual"]
+    });
+    await expect(adapter.getQuote({ market: "korea", symbol: "005930" })).resolves.toBeNull();
+  });
+
+  it("summarizes dry-run journal history for trading status", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-trading-"));
+    const signal = createTradingSignal({
+      signalId: "signal_20260622_005930_blocked",
+      createdAt: "2026-06-22T09:00:00.000Z",
+      market: "korea",
+      symbol: "005930",
+      strategyId: "watch_momentum",
+      direction: "watch",
+      confidence: "low",
+      reason: "Blocked deterministic watch candidate.",
+      dataTimestamp: "2026-06-22T08:59:00.000Z",
+      sourceRefs: ["watchlist"],
+      riskCheck: {
+        status: "blocked",
+        reasons: ["Market data is stale."]
+      },
+      recommendedAction: "Review data freshness before dry-run.",
+      executionMode: "dry_run",
+      expiresAt: "2026-06-22T15:30:00.000Z"
+    });
+    await appendDryRunJournalEntry(
+      memoryRoot,
+      createDryRunJournalEntry({
+        signal,
+        createdAt: "2026-06-22T09:00:00.000Z",
+        simulatedOrder: {
+          side: "buy",
+          quantity: 1,
+          estimatedPrice: 70_000,
+          currency: "KRW"
+        }
+      })
+    );
+
+    await expect(summarizeDryRunJournal(memoryRoot, "2026-06")).resolves.toEqual({
+      month: "2026-06",
+      entries: 1,
+      passed: 0,
+      blocked: 1,
+      latest_signal_id: "signal_20260622_005930_blocked"
+    });
+    await expect(summarizeDryRunJournal(memoryRoot, "2026-07")).resolves.toEqual({
+      month: "2026-07",
+      entries: 0,
+      passed: 0,
+      blocked: 0
     });
   });
 });

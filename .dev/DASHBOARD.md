@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M5, Trading Watch and Dry-run
-- Current task: dry-run journal and risk manager implemented; next is market data adapter interface
+- Current task: market data adapter and dry-run summary visibility implemented; next is safe watchlist persistence
 
 ## Milestone Progress
 
@@ -83,6 +83,9 @@ Update it whenever development state changes.
 - [x] M5 deterministic risk manager implemented.
 - [x] M5 trading signal creation implemented.
 - [x] M5 dry-run journal append implemented.
+- [x] M5 market data adapter interface implemented.
+- [x] M5 dry-run journal summary exposed through daemon trading status.
+- [x] M5 dry-run journal summary visible in desktop Dashboard.
 
 ## M0 Checklist
 
@@ -185,11 +188,13 @@ Update it whenever development state changes.
 - [x] Trading status exposes watchlist count.
 - [x] `GET /trading/status` daemon route exists.
 - [x] `real_trading_enabled: false` blocks real execution mode.
-- [ ] Market data adapter interface exists.
+- [x] Market data adapter interface exists.
 - [x] Trading signal object creation exists.
 - [x] Risk manager exists.
 - [x] Dry-run journal exists.
 - [x] Signal and dry-run journal entries can be created.
+- [x] Dry-run journal summary is exposed in daemon trading status.
+- [x] Desktop Dashboard shows dry-run journal summary.
 
 ## Verification Log
 
@@ -294,6 +299,15 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M5 risk manager and dry-run journal work.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 risk manager and dry-run journal work.
 - 2026-06-22: M5 risk manager and dry-run journal pushed to `origin/codex/add-agent-development-guide` at commit `b5221e6`.
+- 2026-06-22: M5 market data adapter and dry-run summary tests added; TDD red phase confirmed for missing trading exports and daemon journal summary.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts apps/daemon/src/status.test.ts` passed, 15 files and 75 tests.
+- 2026-06-22: Desktop trading dry-run summary mapping/rendering tests added.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts apps/daemon/src/status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts` passed, 15 files and 75 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 15 files and 75 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M5 market data adapter and dry-run summary visibility work.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 market data adapter and dry-run summary visibility work.
+- 2026-06-22: Docs relative link check passed after M5 market data adapter and dry-run summary visibility work.
+- 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 
 ## Known Constraints
 
@@ -306,6 +320,6 @@ Update it whenever development state changes.
 
 Continue M5 Trading Watch and Dry-run:
 
-1. Add market data adapter interface tests.
-2. Connect dry-run journal summaries to daemon trading status.
+1. Add safe watchlist persistence for manual user-managed symbols.
+2. Add a manual trading signal creation route if needed.
 3. Keep all real broker/order paths blocked until user supplies official API details.

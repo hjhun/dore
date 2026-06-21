@@ -1,4 +1,8 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { appendDryRunJournalEntry, createDryRunJournalEntry, createTradingSignal } from "../../../packages/trading/src/index.js";
 import { createDaemonApp } from "./server.js";
 
 describe("daemon status", () => {
@@ -57,5 +61,59 @@ describe("daemon status", () => {
       })
     );
     expect(body.blocked_actions).toContain("Real trading disabled.");
+  });
+
+  it("includes dry-run journal summary in trading status", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-trading-"));
+    const signal = createTradingSignal({
+      signalId: "signal_20260622_AAPL_status",
+      createdAt: "2026-06-22T09:00:00.000Z",
+      market: "us",
+      symbol: "AAPL",
+      strategyId: "watch_momentum",
+      direction: "watch",
+      confidence: "low",
+      reason: "Status summary candidate.",
+      dataTimestamp: "2026-06-22T08:59:00.000Z",
+      sourceRefs: ["watchlist"],
+      riskCheck: {
+        status: "pass",
+        reasons: []
+      },
+      recommendedAction: "Record dry-run candidate only.",
+      executionMode: "dry_run",
+      expiresAt: "2026-06-22T15:30:00.000Z"
+    });
+    await appendDryRunJournalEntry(
+      memoryRoot,
+      createDryRunJournalEntry({
+        signal,
+        createdAt: "2026-06-22T09:00:00.000Z",
+        simulatedOrder: {
+          side: "buy",
+          quantity: 1,
+          estimatedPrice: 100,
+          currency: "USD"
+        }
+      })
+    );
+    const app = createDaemonApp({
+      memoryRoot,
+      startedAt: new Date("2026-06-22T00:00:00.000Z")
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/trading/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().dry_run_journal).toMatchObject({
+      month: "2026-06",
+      entries: 1,
+      passed: 1,
+      blocked: 0,
+      latest_signal_id: "signal_20260622_AAPL_status"
+    });
   });
 });

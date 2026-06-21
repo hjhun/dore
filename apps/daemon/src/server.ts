@@ -12,7 +12,7 @@ import {
 } from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
 import { createTelegramAdapterStatus } from "../../../packages/telegram/src/index.js";
-import { createTradingStatus } from "../../../packages/trading/src/index.js";
+import { createTradingStatus, summarizeDryRunJournal } from "../../../packages/trading/src/index.js";
 
 export interface DaemonAppOptions {
   startedAt?: Date;
@@ -97,7 +97,7 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       scheduler: {
         jobs: scheduler.list()
       },
-      trading: createLocalTradingStatus(),
+      trading: await createLocalTradingStatus(memoryRoot, startedAt),
       engineering: {
         tasks: Array.from(engineeringTasks.values()).map((task) => ({
           id: task.intake.id,
@@ -109,7 +109,7 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
     };
   });
 
-  app.get("/trading/status", async () => createLocalTradingStatus());
+  app.get("/trading/status", async () => createLocalTradingStatus(memoryRoot, startedAt));
 
   app.post("/engineering/intake", async (request, reply) => {
     const payload = request.body as { idea?: unknown; requested_by?: unknown; now?: unknown } | null;
@@ -270,9 +270,11 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
   return app;
 }
 
-function createLocalTradingStatus() {
+async function createLocalTradingStatus(memoryRoot: string, now: Date) {
+  const month = now.toISOString().slice(0, 7);
   return createTradingStatus({
-    realTradingEnabled: false
+    realTradingEnabled: false,
+    dryRunJournal: await summarizeDryRunJournal(memoryRoot, month)
   });
 }
 
