@@ -308,6 +308,7 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 market data adapter and dry-run summary visibility work.
 - 2026-06-22: Docs relative link check passed after M5 market data adapter and dry-run summary visibility work.
 - 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
+- 2026-06-22: M5 market data adapter and dry-run summary visibility pushed to `origin/codex/add-agent-development-guide` at commit `b04620a`.
 
 ## Known Constraints
 
