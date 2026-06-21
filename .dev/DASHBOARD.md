@@ -284,6 +284,7 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 trading status foundation.
 - 2026-06-22: Docs relative link check passed after M5 trading status foundation docs update.
 - 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
+- 2026-06-22: M5 trading watch status foundation pushed to `origin/codex/add-agent-development-guide` at commit `98ae785`.
 
 ## Known Constraints
 
