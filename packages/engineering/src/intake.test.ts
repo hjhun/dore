@@ -1,8 +1,13 @@
+import { mkdtemp, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  appendProjectIntakeEvent,
   createProjectIntake,
   createTestExecutionRecord,
-  detectVerificationCommands
+  detectVerificationCommands,
+  inspectRepository
 } from "./index.js";
 
 describe("engineering project intake", () => {
@@ -95,5 +100,64 @@ describe("engineering project intake", () => {
     expect(record.outputSummary).toContain(`${telegramTokenName}=<redacted>`);
     expect(record.outputSummary).not.toContain("abc123");
     expect(record.outputSummary).not.toContain("telegram-secret");
+  });
+
+  it("inspects repository branch and changed files through git", async () => {
+    const repo = await inspectRepository("/workspace/dore", {
+      execFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/m4\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: " M packages/engineering/src/index.ts\n?? packages/engineering/src/repo.test.ts\n" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      }
+    });
+
+    expect(repo).toEqual({
+      branch: "feature/m4",
+      dirty: true,
+      changedFiles: ["packages/engineering/src/index.ts", "packages/engineering/src/repo.test.ts"]
+    });
+  });
+
+  it("returns an unknown clean snapshot when repo inspection fails", async () => {
+    const repo = await inspectRepository("/not-a-repo", {
+      execFile: async () => {
+        throw new Error("not a git repository");
+      }
+    });
+
+    expect(repo).toEqual({
+      branch: "unknown",
+      dirty: false,
+      changedFiles: []
+    });
+  });
+
+  it("logs project intake as a safe task event", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-"));
+    const eventLogPath = join(memoryRoot, "logs", "events", "engineering.jsonl");
+    const intake = createProjectIntake({
+      idea: "Add repo inspection workflow",
+      requestedBy: "hjhun",
+      now: "2026-06-21T00:00:00.000Z"
+    });
+
+    await appendProjectIntakeEvent(eventLogPath, intake);
+
+    const [line] = (await readFile(eventLogPath, "utf8")).trim().split("\n");
+    const record = JSON.parse(line);
+    expect(record).toMatchObject({
+      actor: "dore",
+      event_type: "task_started",
+      entity_type: "task",
+      entity_id: intake.id,
+      risk_level: "write",
+      summary: "Engineering intake planned: Add repo inspection workflow"
+    });
+    expect(JSON.stringify(record)).not.toContain("api_key");
+    expect(JSON.stringify(record)).not.toContain("token");
   });
 });

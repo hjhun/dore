@@ -58,6 +58,8 @@ Update it whenever development state changes.
 - [x] M4 technical design draft workflow implemented.
 - [x] M4 test command detection implemented.
 - [x] M4 test execution record implemented with secret-like output redaction.
+- [x] M4 repo inspection workflow implemented.
+- [x] M4 engineering intake event logging implemented.
 
 ## M0 Checklist
 
@@ -133,9 +135,10 @@ Update it whenever development state changes.
 - [x] Project intake workflow exists.
 - [x] Requirement draft workflow exists.
 - [x] Technical design workflow exists.
-- [ ] Repo inspection workflow exists.
+- [x] Repo inspection workflow exists.
 - [x] Change plan generator exists.
 - [x] Test detection and execution record exists.
+- [x] Engineering intake can be logged through append-only event logs.
 - [ ] Small repo change can be planned, implemented, tested, and logged through daemon/task logs.
 
 ## Verification Log
@@ -183,6 +186,10 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 12 files and 35 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after M4 intake foundation.
 - 2026-06-21: M4 engineering intake foundation pushed to `origin/codex/add-agent-development-guide` at commit `7a35343`.
+- 2026-06-21: M4 repo inspection and intake event logging tests added; TDD red phase confirmed for missing `inspectRepository` and `appendProjectIntakeEvent`.
+- 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 12 files and 38 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after M4 repo inspection and logging.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 repo inspection and logging.
 
 ## Known Constraints
 
@@ -195,6 +202,6 @@ Update it whenever development state changes.
 
 Start M4 Development Agent MVP:
 
-1. Add repo inspection workflow that reads branch, dirty state, and changed files.
-2. Connect engineering intake output to daemon/task or memory logs.
-3. Add review summary generator.
+1. Add review summary generator.
+2. Connect engineering intake to daemon routes or CLI entrypoint.
+3. Persist generated requirement/design drafts under memory operations.

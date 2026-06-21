@@ -1,3 +1,9 @@
+import { execFile as nodeExecFile } from "node:child_process";
+import { promisify } from "node:util";
+import { appendEvent } from "../../core/src/index.js";
+
+const execFileAsync = promisify(nodeExecFile);
+
 export interface PackageJsonLike {
   scripts?: Record<string, string>;
 }
@@ -75,6 +81,14 @@ export interface ProjectIntake {
   };
 }
 
+export interface ExecFileResult {
+  stdout: string;
+}
+
+export interface RepoInspectionOptions {
+  execFile?: (command: string, args: string[]) => Promise<ExecFileResult>;
+}
+
 const COMMAND_ORDER: VerificationCommand["kind"][] = ["test", "build", "desktop_build", "lint", "doctor"];
 const SCRIPT_BY_KIND: Record<VerificationCommand["kind"], string> = {
   test: "test",
@@ -144,6 +158,45 @@ export function createTestExecutionRecord(input: TestExecutionRecordInput): Test
     durationMs,
     outputSummary: sanitizeExecutionOutput(input.output)
   };
+}
+
+export async function inspectRepository(projectRoot: string, options: RepoInspectionOptions = {}): Promise<RepoSnapshot> {
+  const execFile = options.execFile ?? defaultExecFile;
+
+  try {
+    const [{ stdout: branchStdout }, { stdout: statusStdout }] = await Promise.all([
+      execFile("git", ["-C", projectRoot, "branch", "--show-current"]),
+      execFile("git", ["-C", projectRoot, "status", "--short"])
+    ]);
+    const changedFiles = parseGitStatusFiles(statusStdout);
+    return {
+      branch: branchStdout.trim() || "detached",
+      dirty: changedFiles.length > 0,
+      changedFiles
+    };
+  } catch {
+    return {
+      branch: "unknown",
+      dirty: false,
+      changedFiles: []
+    };
+  }
+}
+
+export async function appendProjectIntakeEvent(eventLogPath: string, intake: ProjectIntake): Promise<void> {
+  await appendEvent(eventLogPath, {
+    id: `event_${intake.id}`,
+    time: intake.executionRecord.generatedAt,
+    actor: "dore",
+    event_type: "task_started",
+    entity_type: "task",
+    entity_id: intake.id,
+    summary: `Engineering intake planned: ${intake.projectName}`,
+    risk_level: "write",
+    refs: ["engineering_intake"],
+    project_name: intake.projectName,
+    verification_commands: intake.verificationPlan.commands.map((command) => command.command)
+  });
 }
 
 function createRequirementDraft(
@@ -239,4 +292,23 @@ function sanitizeExecutionOutput(output: string): string {
     .replace(/\b(OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|TELEGRAM_BOT_TOKEN)=\S+/g, "$1=<redacted>")
     .replace(/\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY))=\S+/g, "$1=<redacted>")
     .replace(/\bsk-[A-Za-z0-9_-]+/g, "<redacted>");
+}
+
+async function defaultExecFile(command: string, args: string[]): Promise<ExecFileResult> {
+  const { stdout } = await execFileAsync(command, args);
+  return {
+    stdout: stdout.toString()
+  };
+}
+
+function parseGitStatusFiles(status: string): string[] {
+  return status
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .map((line) => line.slice(3).trim())
+    .map((file) => {
+      const renameSeparator = " -> ";
+      return file.includes(renameSeparator) ? file.split(renameSeparator).at(-1) ?? file : file;
+    });
 }

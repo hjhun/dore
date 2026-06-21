@@ -144,7 +144,9 @@ Status:
 
 - `packages/engineering` provides a deterministic project intake workflow.
 - Project intake can generate requirement and technical design drafts, a change plan, verification command detection, and secret-redacted test execution records.
-- Remaining work is real repo inspection, daemon/task log integration, and review summary generation.
+- Repo inspection can read branch, dirty state, and changed files.
+- Engineering intake can be recorded as a safe append-only task event.
+- Remaining work is daemon/CLI entrypoint integration, draft persistence under memory operations, and review summary generation.
 
 Deliverables:
 
