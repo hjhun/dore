@@ -293,6 +293,7 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 15 files and 72 tests.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M5 risk manager and dry-run journal work.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 risk manager and dry-run journal work.
+- 2026-06-22: M5 risk manager and dry-run journal pushed to `origin/codex/add-agent-development-guide` at commit `b5221e6`.
 
 ## Known Constraints
 
