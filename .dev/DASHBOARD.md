@@ -182,6 +182,7 @@ Update it whenever development state changes.
 - 2026-06-21: M4 engineering intake tests added; TDD red phase confirmed for missing `packages/engineering/src/index.ts`.
 - 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 12 files and 35 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after M4 intake foundation.
+- 2026-06-21: M4 engineering intake foundation pushed to `origin/codex/add-agent-development-guide` at commit `7a35343`.
 
 ## Known Constraints
 
