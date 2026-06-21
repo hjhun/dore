@@ -78,6 +78,7 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 7 files and 15 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
 - 2026-06-21: `DORE_MEMORY_ROOT=/tmp/dore-briefing-test npx --yes pnpm@11.8.0 briefing:run` created Markdown, JSON, and usage JSONL outputs.
+- 2026-06-21: M1 manual daily briefing pushed to `origin/codex/add-agent-development-guide` at commit `81b4fba`.
 
 ## Known Constraints
 
