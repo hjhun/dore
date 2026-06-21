@@ -8,8 +8,8 @@ Update it whenever development state changes.
 
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
-- Active milestone: M5, Trading Watch and Dry-run
-- Current task: manual dry-run signal route implemented; next is M5 acceptance audit
+- Active milestone: M6, Pilot Real Trading Preparation
+- Current task: M5 accepted; next is M6 real-trading gate scaffolding
 
 ## Milestone Progress
 
@@ -90,6 +90,12 @@ Update it whenever development state changes.
 - [x] M5 persisted watchlist is visible in daemon trading status.
 - [x] M5 manual dry-run trading signal route implemented.
 - [x] M5 manual dry-run route rejects real execution mode.
+- [x] M5 acceptance audit documented.
+- [ ] M6 real trading remains disabled by default in config gates.
+- [ ] M6 broker credential references can be configured without raw secrets.
+- [ ] M6 kill switch gate is represented in status.
+- [ ] M6 approval gate is represented before real execution.
+- [ ] M6 risk limit gate is represented before real execution.
 
 ## M0 Checklist
 
@@ -203,6 +209,17 @@ Update it whenever development state changes.
 - [x] Persisted watchlist items are exposed in daemon trading status.
 - [x] Manual dry-run route creates trading signals and journal entries.
 - [x] Manual dry-run route rejects real execution mode.
+- [x] M5 acceptance audit proves roadmap acceptance criteria.
+
+## M6 Checklist
+
+- [ ] Real trading remains disabled by default.
+- [ ] Enabling real trading requires explicit config.
+- [ ] Broker credentials are represented only through secret references.
+- [ ] Kill switch gate is visible and defaults to blocking.
+- [ ] Approval gate is required before any future real execution.
+- [ ] Risk limit gate is required before any future real execution.
+- [ ] Missing official broker API details keep all real order paths blocked.
 
 ## Verification Log
 
@@ -331,6 +348,12 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 manual dry-run route work.
 - 2026-06-22: Docs relative link check passed after M5 manual dry-run route docs update.
 - 2026-06-22: Changed-file secret-like scan found no plaintext secret values.
+- 2026-06-22: M5 acceptance audit documented in `docs/plan/MILESTONE_5_ACCEPTANCE_AUDIT.md`.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M5 acceptance audit, 15 files and 79 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M5 acceptance audit.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 acceptance audit.
+- 2026-06-22: Docs relative link check passed after M5 acceptance audit docs update.
+- 2026-06-22: Changed-file secret-like scan found no plaintext secret values after M5 acceptance audit.
 
 ## Known Constraints
 
@@ -341,7 +364,7 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Continue M5 Trading Watch and Dry-run:
+Continue M6 Pilot Real Trading Preparation:
 
-1. Add a M5 completion audit against roadmap acceptance.
+1. Start M6 real-trading gate scaffolding.
 2. Keep all real broker/order paths blocked until user supplies official API details.

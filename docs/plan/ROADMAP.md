@@ -196,7 +196,7 @@ Status:
 - Desktop Dashboard maps and renders dry-run journal summary from daemon status.
 - Watchlists can be persisted under local memory data and restored into daemon trading status.
 - Manual dry-run signal creation route records signals and journal entries while rejecting real execution mode.
-- Remaining work is an M5 acceptance audit.
+- M5 acceptance audit is documented in [MILESTONE_5_ACCEPTANCE_AUDIT.md](MILESTONE_5_ACCEPTANCE_AUDIT.md).
 
 Deliverables:
 
@@ -224,6 +224,12 @@ Acceptance:
 Goal:
 
 - Prepare, but do not enable by default, the gates for future small real orders.
+
+Status:
+
+- Not started.
+- Official broker API and terms are still pending user input.
+- The next safe slice is config and gate scaffolding while keeping real trading disabled by default.
 
 Prerequisites:
 
