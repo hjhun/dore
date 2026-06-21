@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M4, Development Agent MVP
-- Current task: start Development Agent MVP after M3 dashboard completion
+- Current task: connect M4 engineering intake to executable workflows and task logs
 
 ## Milestone Progress
 
@@ -60,6 +60,9 @@ Update it whenever development state changes.
 - [x] M4 test execution record implemented with secret-like output redaction.
 - [x] M4 repo inspection workflow implemented.
 - [x] M4 engineering intake event logging implemented.
+- [x] M4 review summary generator implemented.
+- [x] M4 requirement/design/change-plan draft persistence implemented.
+- [x] M4 engineering intake CLI entrypoint implemented.
 
 ## M0 Checklist
 
@@ -139,6 +142,9 @@ Update it whenever development state changes.
 - [x] Change plan generator exists.
 - [x] Test detection and execution record exists.
 - [x] Engineering intake can be logged through append-only event logs.
+- [x] Review summary generator exists.
+- [x] Requirement/design/change-plan drafts can be persisted under `memory/operations/engineering`.
+- [x] `pnpm engineering:intake` CLI entrypoint exists.
 - [ ] Small repo change can be planned, implemented, tested, and logged through daemon/task logs.
 
 ## Verification Log
@@ -191,6 +197,11 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after M4 repo inspection and logging.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 repo inspection and logging.
 - 2026-06-21: M4 repo inspection and intake event logging pushed to `origin/codex/add-agent-development-guide` at commit `68ff91b`.
+- 2026-06-22: M4 review summary, draft persistence, and CLI tests added; TDD red phase confirmed for missing `createReviewSummary`, `persistProjectIntakeDrafts`, `runEngineeringIntake`, and CLI module.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 13 files and 44 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 review summary, persistence, and CLI work.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 review summary, persistence, and CLI work.
+- 2026-06-22: `DORE_MEMORY_ROOT=/tmp/dore-engineering-cli-test DORE_NOW=2026-06-22T00:00:00.000Z npx --yes pnpm@11.8.0 engineering:intake "Add review summary CLI"` wrote requirements, technical design, change plan, intake JSON, and event JSONL.
 
 ## Known Constraints
 
@@ -203,6 +214,6 @@ Update it whenever development state changes.
 
 Start M4 Development Agent MVP:
 
-1. Add review summary generator.
-2. Connect engineering intake to daemon routes or CLI entrypoint.
-3. Persist generated requirement/design drafts under memory operations.
+1. Add daemon route or task wrapper for engineering intake.
+2. Add execution workflow that records implementation/test outcomes against the task log.
+3. Connect review summaries to the generated intake artifacts.

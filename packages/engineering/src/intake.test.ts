@@ -5,9 +5,12 @@ import { describe, expect, it } from "vitest";
 import {
   appendProjectIntakeEvent,
   createProjectIntake,
+  createReviewSummary,
   createTestExecutionRecord,
   detectVerificationCommands,
-  inspectRepository
+  inspectRepository,
+  persistProjectIntakeDrafts,
+  runEngineeringIntake
 } from "./index.js";
 
 describe("engineering project intake", () => {
@@ -159,5 +162,87 @@ describe("engineering project intake", () => {
     });
     expect(JSON.stringify(record)).not.toContain("api_key");
     expect(JSON.stringify(record)).not.toContain("token");
+  });
+
+  it("creates a review summary from verification records", () => {
+    const intake = createProjectIntake({
+      idea: "Add review summary generator",
+      requestedBy: "hjhun",
+      now: "2026-06-22T00:00:00.000Z"
+    });
+    const summary = createReviewSummary({
+      intake,
+      repo: {
+        branch: "feature/m4",
+        dirty: true,
+        changedFiles: ["packages/engineering/src/index.ts"]
+      },
+      executions: [
+        createTestExecutionRecord({
+          command: "pnpm test",
+          exitCode: 0,
+          startedAt: "2026-06-22T00:00:00.000Z",
+          completedAt: "2026-06-22T00:00:01.000Z",
+          output: "ok"
+        }),
+        createTestExecutionRecord({
+          command: "pnpm build",
+          exitCode: 1,
+          startedAt: "2026-06-22T00:00:01.000Z",
+          completedAt: "2026-06-22T00:00:02.000Z",
+          output: "type error"
+        })
+      ]
+    });
+
+    expect(summary.status).toBe("needs_work");
+    expect(summary.findings).toContain("Verification failed: pnpm build");
+    expect(summary.residualRisks).toContain("Working tree still has 1 changed file.");
+  });
+
+  it("persists requirement, design, change plan, and intake JSON under memory operations", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-"));
+    const intake = createProjectIntake({
+      idea: "Persist development drafts",
+      requestedBy: "hjhun",
+      now: "2026-06-22T00:00:00.000Z"
+    });
+
+    const result = await persistProjectIntakeDrafts(memoryRoot, intake);
+
+    expect(await readFile(result.requirementPath, "utf8")).toContain("# Requirements - Persist development drafts");
+    expect(await readFile(result.technicalDesignPath, "utf8")).toContain("# Technical Design - Persist development drafts");
+    expect(await readFile(result.changePlanPath, "utf8")).toContain("# Change Plan - Persist development drafts");
+    expect(JSON.parse(await readFile(result.intakeJsonPath, "utf8")).id).toBe(intake.id);
+  });
+
+  it("runs project intake end-to-end with repo inspection, draft persistence, and event logging", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-"));
+    const result = await runEngineeringIntake({
+      idea: "Add daemon engineering intake command",
+      requestedBy: "hjhun",
+      now: "2026-06-22T00:00:00.000Z",
+      memoryRoot,
+      projectRoot: "/workspace/dore",
+      packageJson: {
+        scripts: {
+          test: "vitest run",
+          build: "tsc -p tsconfig.json"
+        }
+      },
+      execFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/m4\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      }
+    });
+
+    expect(result.intake.changePlan.steps[0]).toContain("Repo branch feature/m4");
+    expect(await readFile(result.drafts.requirementPath, "utf8")).toContain("Add daemon engineering intake command");
+    expect(await readFile(result.eventLogPath, "utf8")).toContain("Engineering intake planned");
   });
 });

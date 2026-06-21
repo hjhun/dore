@@ -12,7 +12,8 @@
     "dev:daemon": "tsx apps/daemon/src/main.ts",
     "dev:desktop": "vite --config apps/desktop/vite.config.ts --host 127.0.0.1",
     "build:desktop": "vite build --config apps/desktop/vite.config.ts",
-    "briefing:run": "tsx apps/daemon/src/briefing-run.ts"
+    "briefing:run": "tsx apps/daemon/src/briefing-run.ts",
+    "engineering:intake": "tsx apps/daemon/src/engineering-intake.ts"
   },
   "dependencies": {
     "fastify": "^5.2.1",

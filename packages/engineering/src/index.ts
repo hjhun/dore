@@ -1,4 +1,6 @@
 import { execFile as nodeExecFile } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { appendEvent } from "../../core/src/index.js";
 
@@ -81,12 +83,54 @@ export interface ProjectIntake {
   };
 }
 
+export interface ReviewSummaryInput {
+  intake: ProjectIntake;
+  repo: RepoSnapshot;
+  executions: TestExecutionRecord[];
+}
+
+export interface ReviewSummary {
+  status: "ready_for_review" | "needs_work";
+  findings: string[];
+  residualRisks: string[];
+  verification: {
+    passed: string[];
+    failed: string[];
+  };
+}
+
 export interface ExecFileResult {
   stdout: string;
 }
 
 export interface RepoInspectionOptions {
   execFile?: (command: string, args: string[]) => Promise<ExecFileResult>;
+}
+
+export interface PersistProjectIntakeDraftsResult {
+  baseDir: string;
+  requirementPath: string;
+  technicalDesignPath: string;
+  changePlanPath: string;
+  intakeJsonPath: string;
+}
+
+export interface RunEngineeringIntakeInput {
+  idea: string;
+  requestedBy: string;
+  now: string;
+  memoryRoot: string;
+  projectRoot: string;
+  packageJson?: PackageJsonLike;
+  constraints?: string[];
+  acceptanceCriteria?: string[];
+  execFile?: (command: string, args: string[]) => Promise<ExecFileResult>;
+}
+
+export interface RunEngineeringIntakeResult {
+  intake: ProjectIntake;
+  drafts: PersistProjectIntakeDraftsResult;
+  eventLogPath: string;
 }
 
 const COMMAND_ORDER: VerificationCommand["kind"][] = ["test", "build", "desktop_build", "lint", "doctor"];
@@ -160,6 +204,27 @@ export function createTestExecutionRecord(input: TestExecutionRecordInput): Test
   };
 }
 
+export function createReviewSummary(input: ReviewSummaryInput): ReviewSummary {
+  const failed = input.executions.filter((execution) => execution.status === "failed").map((execution) => execution.command);
+  const passed = input.executions.filter((execution) => execution.status === "passed").map((execution) => execution.command);
+  const findings = failed.map((command) => `Verification failed: ${command}`);
+  const residualRisks = input.repo.dirty ? [`Working tree still has ${input.repo.changedFiles.length} changed file${input.repo.changedFiles.length === 1 ? "" : "s"}.`] : [];
+
+  if (input.executions.length === 0) {
+    residualRisks.push("No verification executions were recorded.");
+  }
+
+  return {
+    status: failed.length === 0 && residualRisks.length === 0 ? "ready_for_review" : "needs_work",
+    findings,
+    residualRisks,
+    verification: {
+      passed,
+      failed
+    }
+  };
+}
+
 export async function inspectRepository(projectRoot: string, options: RepoInspectionOptions = {}): Promise<RepoSnapshot> {
   const execFile = options.execFile ?? defaultExecFile;
 
@@ -197,6 +262,54 @@ export async function appendProjectIntakeEvent(eventLogPath: string, intake: Pro
     project_name: intake.projectName,
     verification_commands: intake.verificationPlan.commands.map((command) => command.command)
   });
+}
+
+export async function persistProjectIntakeDrafts(
+  memoryRoot: string,
+  intake: ProjectIntake
+): Promise<PersistProjectIntakeDraftsResult> {
+  const baseDir = join(memoryRoot, "operations", "engineering", intake.id);
+  await mkdir(baseDir, { recursive: true });
+
+  const requirementPath = join(baseDir, "requirements.md");
+  const technicalDesignPath = join(baseDir, "technical-design.md");
+  const changePlanPath = join(baseDir, "change-plan.md");
+  const intakeJsonPath = join(baseDir, "intake.json");
+
+  await writeFile(requirementPath, renderDraftMarkdown("Requirements", intake.requirementDraft), "utf8");
+  await writeFile(technicalDesignPath, renderDraftMarkdown("Technical Design", intake.technicalDesignDraft), "utf8");
+  await writeFile(changePlanPath, renderChangePlanMarkdown(intake), "utf8");
+  await writeFile(intakeJsonPath, `${sanitizePersistedJson(intake)}\n`, "utf8");
+
+  return {
+    baseDir,
+    requirementPath,
+    technicalDesignPath,
+    changePlanPath,
+    intakeJsonPath
+  };
+}
+
+export async function runEngineeringIntake(input: RunEngineeringIntakeInput): Promise<RunEngineeringIntakeResult> {
+  const repo = await inspectRepository(input.projectRoot, { execFile: input.execFile });
+  const intake = createProjectIntake({
+    idea: input.idea,
+    requestedBy: input.requestedBy,
+    now: input.now,
+    constraints: input.constraints,
+    acceptanceCriteria: input.acceptanceCriteria,
+    repo,
+    packageJson: input.packageJson
+  });
+  const drafts = await persistProjectIntakeDrafts(input.memoryRoot, intake);
+  const eventLogPath = join(input.memoryRoot, "logs", "events", "engineering.jsonl");
+  await appendProjectIntakeEvent(eventLogPath, intake);
+
+  return {
+    intake,
+    drafts,
+    eventLogPath
+  };
 }
 
 function createRequirementDraft(
@@ -292,6 +405,40 @@ function sanitizeExecutionOutput(output: string): string {
     .replace(/\b(OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|TELEGRAM_BOT_TOKEN)=\S+/g, "$1=<redacted>")
     .replace(/\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY))=\S+/g, "$1=<redacted>")
     .replace(/\bsk-[A-Za-z0-9_-]+/g, "<redacted>");
+}
+
+function renderDraftMarkdown(label: string, draft: DraftDocument): string {
+  const lines = [`# ${label} - ${sanitizeExecutionOutput(draft.title)}`, "", `Generated: ${draft.generatedAt}`, ""];
+  for (const section of draft.sections) {
+    lines.push(`## ${section.heading}`, "");
+    for (const item of section.body) {
+      lines.push(`- ${sanitizeExecutionOutput(item)}`);
+    }
+    lines.push("");
+  }
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+function renderChangePlanMarkdown(intake: ProjectIntake): string {
+  return [
+    `# Change Plan - ${sanitizeExecutionOutput(intake.projectName)}`,
+    "",
+    `Generated: ${intake.executionRecord.generatedAt}`,
+    "",
+    `Summary: ${sanitizeExecutionOutput(intake.changePlan.summary)}`,
+    "",
+    "## Steps",
+    "",
+    ...intake.changePlan.steps.map((step, index) => `${index + 1}. ${sanitizeExecutionOutput(step)}`),
+    "",
+    "## Verification",
+    "",
+    ...intake.verificationPlan.commands.map((command) => `- ${command.command}`)
+  ].join("\n");
+}
+
+function sanitizePersistedJson(value: unknown): string {
+  return sanitizeExecutionOutput(JSON.stringify(value, null, 2));
 }
 
 async function defaultExecFile(command: string, args: string[]): Promise<ExecFileResult> {

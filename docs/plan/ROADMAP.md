@@ -146,7 +146,10 @@ Status:
 - Project intake can generate requirement and technical design drafts, a change plan, verification command detection, and secret-redacted test execution records.
 - Repo inspection can read branch, dirty state, and changed files.
 - Engineering intake can be recorded as a safe append-only task event.
-- Remaining work is daemon/CLI entrypoint integration, draft persistence under memory operations, and review summary generation.
+- Requirement, technical design, and change-plan drafts can be persisted under `memory/operations/engineering`.
+- Review summaries can classify verification failures and residual repo risks.
+- `pnpm engineering:intake` provides a local CLI entrypoint for generating drafts and event logs.
+- Remaining work is daemon route/task wrapper integration and recording implementation/test outcomes against task logs.
 
 Deliverables:
 
