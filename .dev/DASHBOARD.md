@@ -149,6 +149,7 @@ Update it whenever development state changes.
 - 2026-06-21: M3 Electron dashboard foundation pushed to `origin/codex/add-agent-development-guide` at commit `736584a`.
 - 2026-06-21: M3 daemon status mapper and offline fallback tests added; `npx --yes pnpm@11.8.0 test` passed, 11 files and 28 tests.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` and `npx --yes pnpm@11.8.0 build:desktop` passed after daemon-connected dashboard work.
+- 2026-06-21: M3 daemon-connected dashboard pushed to `origin/codex/add-agent-development-guide` at commit `6cce905`.
 
 ## Known Constraints
 
