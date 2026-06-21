@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import type React from "react";
+
 export interface DashboardStatus {
   daemon: {
     mode: string;
@@ -37,6 +40,8 @@ export interface DashboardStatus {
     trading: "dry_run" | "real_enabled";
   };
 }
+
+type ApprovalDecision = "approved" | "rejected";
 
 export function createMockDashboardStatus(): DashboardStatus {
   return {
@@ -95,8 +100,27 @@ export function createMockDashboardStatus(): DashboardStatus {
 }
 
 export function Dashboard({ status }: { status: DashboardStatus }) {
+  const [approvals, setApprovals] = useState(status.approvals);
+  const [logs, setLogs] = useState(status.logs);
   const tradingState = status.trading.realTradingEnabled ? "Real trading enabled" : "Real trading disabled";
   const telegramState = status.telegram.configured ? "Configured" : "Not configured";
+
+  useEffect(() => {
+    setApprovals(status.approvals);
+    setLogs(status.logs);
+  }, [status.approvals, status.logs]);
+
+  function recordApprovalDecision(approval: DashboardStatus["approvals"][number], decision: ApprovalDecision) {
+    setApprovals((currentApprovals) => currentApprovals.filter((candidate) => candidate.id !== approval.id));
+    setLogs((currentLogs) => [
+      {
+        id: `approval_${approval.id}_${decision}`,
+        eventType: "approval_decision_recorded",
+        summary: `${approval.id} ${decision}`
+      },
+      ...currentLogs
+    ]);
+  }
 
   return (
     <main style={styles.page}>
@@ -140,26 +164,44 @@ export function Dashboard({ status }: { status: DashboardStatus }) {
         </StatusPanel>
 
         <StatusPanel title="Approvals">
-          {status.approvals.length === 0 ? (
+          {approvals.length === 0 ? (
             <p>No pending approvals</p>
           ) : (
-            status.approvals.map((approval) => (
+            approvals.map((approval) => (
               <div key={approval.id} style={styles.stack}>
                 <p>{approval.id}</p>
                 <p>{approval.title}</p>
                 <p>
                   {approval.riskLevel}: {approval.state}
                 </p>
+                <div style={styles.actionRow}>
+                  <button
+                    type="button"
+                    aria-label={`Approve ${approval.id}`}
+                    style={styles.primaryButton}
+                    onClick={() => recordApprovalDecision(approval, "approved")}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Reject ${approval.id}`}
+                    style={styles.secondaryButton}
+                    onClick={() => recordApprovalDecision(approval, "rejected")}
+                  >
+                    Reject
+                  </button>
+                </div>
               </div>
             ))
           )}
         </StatusPanel>
 
         <StatusPanel title="Logs">
-          {status.logs.length === 0 ? (
+          {logs.length === 0 ? (
             <p>No recent logs</p>
           ) : (
-            status.logs.map((log) => (
+            logs.map((log) => (
               <div key={log.id} style={styles.stack}>
                 <p>{log.eventType}</p>
                 <p>{log.summary}</p>
@@ -241,5 +283,31 @@ const styles: Record<string, React.CSSProperties> = {
   stack: {
     display: "grid",
     gap: "4px"
+  },
+  actionRow: {
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+    marginTop: "4px"
+  },
+  primaryButton: {
+    border: "1px solid #175cd3",
+    borderRadius: "6px",
+    background: "#175cd3",
+    color: "#ffffff",
+    padding: "6px 10px",
+    fontSize: "13px",
+    fontWeight: 700,
+    cursor: "pointer"
+  },
+  secondaryButton: {
+    border: "1px solid #d0d5dd",
+    borderRadius: "6px",
+    background: "#ffffff",
+    color: "#344054",
+    padding: "6px 10px",
+    fontSize: "13px",
+    fontWeight: 700,
+    cursor: "pointer"
   }
 };

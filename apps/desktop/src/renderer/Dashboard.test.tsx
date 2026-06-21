@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Dashboard, createMockDashboardStatus } from "./Dashboard.js";
 
@@ -73,5 +73,25 @@ describe("Dashboard", () => {
 
     expect(screen.getByText("No pending approvals")).toBeTruthy();
     expect(screen.getByText("No recent logs")).toBeTruthy();
+  });
+
+  it("approves a pending approval and records a decision log", () => {
+    render(<Dashboard status={createMockDashboardStatus()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve approval_demo_001" }));
+
+    expect(screen.getByText("No pending approvals")).toBeTruthy();
+    expect(screen.getByText("approval_decision_recorded")).toBeTruthy();
+    expect(screen.getByText("approval_demo_001 approved")).toBeTruthy();
+  });
+
+  it("rejects a pending approval and records a decision log", () => {
+    render(<Dashboard status={createMockDashboardStatus()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reject approval_demo_001" }));
+
+    expect(screen.getByText("No pending approvals")).toBeTruthy();
+    expect(screen.getByText("approval_decision_recorded")).toBeTruthy();
+    expect(screen.getByText("approval_demo_001 rejected")).toBeTruthy();
   });
 });

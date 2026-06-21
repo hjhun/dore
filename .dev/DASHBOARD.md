@@ -8,8 +8,8 @@ Update it whenever development state changes.
 
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
-- Active milestone: M3, Electron Dashboard MVP
-- Current task: add interactive approval decisions to the Electron Dashboard panels
+- Active milestone: M4, Development Agent MVP
+- Current task: start Development Agent MVP after M3 dashboard completion
 
 ## Milestone Progress
 
@@ -50,6 +50,7 @@ Update it whenever development state changes.
 - [x] M3 Approvals panel implemented.
 - [x] M3 Logs view implemented.
 - [x] M3 Settings status implemented.
+- [x] M3 approval decisions implemented.
 - [ ] M3 branch pushed.
 
 ## M0 Checklist
@@ -118,7 +119,16 @@ Update it whenever development state changes.
 - [x] Approvals panel can show pending approval mock data.
 - [x] Logs view can show action log mock data.
 - [x] Settings status can show provider/Telegram/memory/trading setup state.
-- [ ] Pending approvals can be approved or rejected.
+- [x] Pending approvals can be approved or rejected.
+
+## M4 Checklist
+
+- [ ] Project intake workflow exists.
+- [ ] Requirement draft workflow exists.
+- [ ] Technical design workflow exists.
+- [ ] Repo inspection workflow exists.
+- [ ] Test detection and execution record exists.
+- [ ] Small repo change can be planned, implemented, tested, and logged.
 
 ## Verification Log
 
@@ -156,6 +166,10 @@ Update it whenever development state changes.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build` passed.
 - 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed.
 - 2026-06-21: M3 dashboard panels pushed to `origin/codex/add-agent-development-guide` at commit `f07c68f`.
+- 2026-06-21: M3 approval decision tests added; TDD red phase confirmed for missing approve/reject buttons.
+- 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 11 files and 31 tests.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build` passed after approval decision implementation.
+- 2026-06-21: `npx --yes pnpm@11.8.0 build:desktop` passed after approval decision implementation.
 
 ## Known Constraints
 
@@ -166,8 +180,9 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Continue M3 Dashboard approvals:
+Start M4 Development Agent MVP:
 
-1. Add approve/reject interactions for pending approvals.
-2. Log approval decisions without raw secret detail.
-3. Keep Electron renderer away from raw secrets and filesystem APIs.
+1. Add project intake workflow tests and implementation.
+2. Add requirement draft workflow.
+3. Add technical design workflow.
+4. Record test detection and execution metadata.

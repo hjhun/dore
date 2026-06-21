@@ -115,7 +115,8 @@ Status:
 - Renderer avoids displaying token/secret detail.
 - Dashboard now maps daemon `/status` payloads and falls back to an offline state when the daemon cannot be reached.
 - Approvals, Logs, and Settings panels render safe mock/default state.
-- Remaining work is approval approve/reject interaction and decision logging.
+- Approval approve/reject interactions record safe decision logs.
+- M3 acceptance is implemented; next work is M4 Development Agent MVP.
 
 Deliverables:
 
