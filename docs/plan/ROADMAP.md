@@ -181,6 +181,15 @@ Goal:
 
 - Prepare safe Korea/US stock watch and dry-run trading without real orders.
 
+Status:
+
+- `packages/trading` provides the first deterministic trading watch foundation.
+- Watchlist symbols can be normalized for Korea and US markets without credentials.
+- Broker capabilities expose Toss and Shinhan as candidates and Samsung as read-only/manual reference.
+- Daemon `/status` and `GET /trading/status` expose broker capability and watchlist status.
+- `real_trading_enabled: false` blocks real execution mode.
+- Remaining work is market data adapter interfaces, trading signal creation, risk manager, and dry-run journal.
+
 Deliverables:
 
 - watchlist store.

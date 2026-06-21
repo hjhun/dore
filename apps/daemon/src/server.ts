@@ -12,6 +12,7 @@ import {
 } from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
 import { createTelegramAdapterStatus } from "../../../packages/telegram/src/index.js";
+import { createTradingStatus } from "../../../packages/trading/src/index.js";
 
 export interface DaemonAppOptions {
   startedAt?: Date;
@@ -96,15 +97,7 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       scheduler: {
         jobs: scheduler.list()
       },
-      trading: {
-        enabled: true,
-        real_trading_enabled: false,
-        brokers: {
-          toss: "candidate",
-          shinhan: "candidate",
-          samsung: "read_only_manual_reference"
-        }
-      },
+      trading: createLocalTradingStatus(),
       engineering: {
         tasks: Array.from(engineeringTasks.values()).map((task) => ({
           id: task.intake.id,
@@ -115,6 +108,8 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       }
     };
   });
+
+  app.get("/trading/status", async () => createLocalTradingStatus());
 
   app.post("/engineering/intake", async (request, reply) => {
     const payload = request.body as { idea?: unknown; requested_by?: unknown; now?: unknown } | null;
@@ -273,6 +268,12 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
   });
 
   return app;
+}
+
+function createLocalTradingStatus() {
+  return createTradingStatus({
+    realTradingEnabled: false
+  });
 }
 
 function isAllowedEngineeringCommand(command: string): boolean {

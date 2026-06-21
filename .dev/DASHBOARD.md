@@ -8,8 +8,8 @@ Update it whenever development state changes.
 
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
-- Active milestone: M4, Development Agent MVP
-- Current task: controlled file-edit executor implemented; verifying M4 completion
+- Active milestone: M5, Trading Watch and Dry-run
+- Current task: trading watchlist and broker capability foundation implemented; next is dry-run journal
 
 ## Milestone Progress
 
@@ -75,6 +75,11 @@ Update it whenever development state changes.
 - [x] M4 executor daemon route logs outcomes against engineering tasks.
 - [x] M4 controlled file-edit executor implemented.
 - [x] M4 file-edit daemon route logs task update events.
+- [x] M5 trading package scaffolded.
+- [x] M5 watchlist store foundation implemented.
+- [x] M5 broker capability registry implemented.
+- [x] M5 `GET /trading/status` route implemented.
+- [x] M5 real trading disabled guard implemented.
 
 ## M0 Checklist
 
@@ -167,6 +172,22 @@ Update it whenever development state changes.
 - [x] Executor output is redacted before being written to task logs.
 - [x] Small repo change can be executed from the agent workflow and fully logged through daemon/task logs.
 
+## M5 Checklist
+
+- [x] `packages/trading` exists.
+- [x] Watchlist store normalizes Korea and US symbols.
+- [x] Broker capability registry exposes Toss, Shinhan, and Samsung status.
+- [x] Samsung defaults to read-only/manual reference policy.
+- [x] Trading status exposes broker capabilities.
+- [x] Trading status exposes watchlist count.
+- [x] `GET /trading/status` daemon route exists.
+- [x] `real_trading_enabled: false` blocks real execution mode.
+- [ ] Market data adapter interface exists.
+- [ ] Trading signal object creation exists.
+- [ ] Risk manager exists.
+- [ ] Dry-run journal exists.
+- [ ] Signal and dry-run journal entries can be created.
+
 ## Verification Log
 
 - 2026-06-21: Docs relative link check passed before plan work.
@@ -256,6 +277,13 @@ Update it whenever development state changes.
 - 2026-06-22: Docs relative link check passed after M4 controlled file-edit executor docs update.
 - 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 - 2026-06-22: M4 controlled file-edit executor pushed to `origin/codex/add-agent-development-guide` at commit `15895e2`.
+- 2026-06-22: M5 trading watchlist, broker capability, real-trading guard, and `/trading/status` tests added; TDD red phase confirmed for missing trading exports and route.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts apps/daemon/src/status.test.ts` passed, 15 files and 68 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 15 files and 68 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M5 trading status foundation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M5 trading status foundation.
+- 2026-06-22: Docs relative link check passed after M5 trading status foundation docs update.
+- 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 
 ## Known Constraints
 
@@ -266,8 +294,8 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Start M5 Trading Watch and Dry-run after committing M4 file-edit executor:
+Continue M5 Trading Watch and Dry-run:
 
-1. Add watchlist and broker capability package tests.
-2. Keep `real_trading_enabled: false` as the default invariant.
-3. Add dry-run journal and risk manager before any real broker integration.
+1. Add dry-run journal tests and append-only trading log output.
+2. Add deterministic risk manager tests.
+3. Keep all real broker/order paths blocked until user supplies official API details.

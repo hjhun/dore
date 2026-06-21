@@ -80,6 +80,8 @@ importers:
 
   packages/telegram: {}
 
+  packages/trading: {}
+
 packages:
 
   '@asamuzakjp/css-color@3.2.0':
