@@ -1,8 +1,10 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  applyControlledFileEdit,
+  appendFileEditEvent,
   appendReviewSummaryEvent,
   appendTestExecutionEvent,
   appendProjectIntakeEvent,
@@ -375,5 +377,84 @@ describe("engineering project intake", () => {
     expect(execution.outputSummary).toContain("partial output");
     expect(execution.outputSummary).toContain(`${tokenName}=<redacted>`);
     expect(execution.outputSummary).not.toContain("token-value");
+  });
+
+  it("applies a controlled exact file edit inside the project root", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "dore-engineering-edit-"));
+    const targetPath = join(projectRoot, "README.md");
+    await writeFile(targetPath, "Before\n", "utf8");
+
+    const edit = await applyControlledFileEdit({
+      projectRoot,
+      relativePath: "README.md",
+      find: "Before",
+      replace: "After"
+    });
+
+    expect(edit).toMatchObject({
+      status: "applied",
+      relativePath: "README.md",
+      replacements: 1
+    });
+    expect(await readFile(targetPath, "utf8")).toBe("After\n");
+  });
+
+  it("blocks controlled file edits outside the project root", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "dore-engineering-edit-"));
+
+    await expect(
+      applyControlledFileEdit({
+        projectRoot,
+        relativePath: "../outside.md",
+        find: "Before",
+        replace: "After"
+      })
+    ).rejects.toThrow("Controlled file edit path must stay inside the project root.");
+  });
+
+  it("blocks controlled file edits that would write secret-like values", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "dore-engineering-edit-"));
+    await writeFile(join(projectRoot, "config.example"), "token=\n", "utf8");
+    const openAiKeyName = ["OPENAI", "API", "KEY"].join("_");
+
+    await expect(
+      applyControlledFileEdit({
+        projectRoot,
+        relativePath: "config.example",
+        find: "token=",
+        replace: `${openAiKeyName}=abc123`
+      })
+    ).rejects.toThrow("Controlled file edit replacement must not contain secret-like values.");
+  });
+
+  it("logs controlled file edits without leaking secret-like values", async () => {
+    const eventLogPath = join(await mkdtemp(join(tmpdir(), "dore-engineering-events-")), "events.jsonl");
+    const intake = createProjectIntake({
+      idea: "Log file edit",
+      requestedBy: "hjhun",
+      now: "2026-06-22T00:00:00.000Z"
+    });
+    const edit = {
+      relativePath: "config.example",
+      status: "applied" as const,
+      replacements: 1,
+      summary: `Set ${["OPENAI", "API", "KEY"].join("_")}=abc123 placeholder`
+    };
+
+    await appendFileEditEvent(eventLogPath, intake, edit);
+
+    const [line] = (await readFile(eventLogPath, "utf8")).trim().split("\n");
+    const record = JSON.parse(line);
+    expect(record).toMatchObject({
+      actor: "dore",
+      event_type: "task_updated",
+      entity_type: "task",
+      entity_id: intake.id,
+      summary: "Engineering file edit applied: config.example",
+      relative_path: "config.example",
+      replacements: 1
+    });
+    expect(record.edit_summary).toContain(`${["OPENAI", "API", "KEY"].join("_")}=<redacted>`);
+    expect(record.edit_summary).not.toContain("abc123");
   });
 });

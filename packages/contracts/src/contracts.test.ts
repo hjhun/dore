@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BrokerCapabilitySchema,
+  EventLogRecordSchema,
   ModelSelectionRequestSchema,
   TaskSchema,
   TradingSignalSchema
@@ -87,5 +88,20 @@ describe("runtime contracts", () => {
 
     expect(signal.execution_mode).toBe("dry_run");
   });
-});
 
+  it("validates task update event records", () => {
+    const event = EventLogRecordSchema.parse({
+      id: "event_20260622_task_update",
+      time: "2026-06-22T00:00:00+09:00",
+      actor: "dore",
+      event_type: "task_updated",
+      entity_type: "task",
+      entity_id: "task_20260622_000001",
+      summary: "Updated task artifact.",
+      risk_level: "write",
+      refs: ["engineering_file_edit"]
+    });
+
+    expect(event.event_type).toBe("task_updated");
+  });
+});

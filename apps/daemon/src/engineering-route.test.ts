@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -245,5 +245,105 @@ describe("daemon engineering routes", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error).toBe("command_not_allowed");
+  });
+
+  it("applies controlled file edits through the engineering task route", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const projectRoot = await mkdtemp(join(tmpdir(), "dore-daemon-project-"));
+    const targetPath = join(projectRoot, "notes.md");
+    await writeFile(targetPath, "status: planned\n", "utf8");
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot,
+      engineeringExecFile: async (_command, args) => {
+        if (args.join(" ") === `-C ${projectRoot} branch --show-current`) {
+          return { stdout: "feature/m4\n" };
+        }
+        if (args.join(" ") === `-C ${projectRoot} status --short`) {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      }
+    });
+
+    const intakeResponse = await app.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Apply file edit",
+        now: "2026-06-22T00:00:00.000Z"
+      }
+    });
+
+    const editResponse = await app.inject({
+      method: "POST",
+      url: `/engineering/tasks/${intakeResponse.json().task_id}/apply-edit`,
+      payload: {
+        path: "notes.md",
+        find: "planned",
+        replace: "implemented"
+      }
+    });
+
+    expect(editResponse.statusCode).toBe(201);
+    expect(editResponse.json().edit.status).toBe("applied");
+    expect(editResponse.json().task_status).toBe("planned");
+    expect(await readFile(targetPath, "utf8")).toBe("status: implemented\n");
+    expect(await readFile(editResponse.json().event_log, "utf8")).toContain("Engineering file edit applied");
+  });
+
+  it("rejects controlled file edits outside the project root", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const projectRoot = await mkdtemp(join(tmpdir(), "dore-daemon-project-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/engineering/tasks/missing/apply-edit",
+      payload: {
+        path: "../outside.md",
+        find: "planned",
+        replace: "implemented"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("file_edit_not_allowed");
+  });
+
+  it("rejects controlled file edits when the exact text is not found", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const projectRoot = await mkdtemp(join(tmpdir(), "dore-daemon-project-"));
+    await writeFile(join(projectRoot, "notes.md"), "status: planned\n", "utf8");
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot
+    });
+
+    const intakeResponse = await app.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Reject missing edit text",
+        now: "2026-06-22T00:00:00.000Z"
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/engineering/tasks/${intakeResponse.json().task_id}/apply-edit`,
+      payload: {
+        path: "notes.md",
+        find: "missing",
+        replace: "implemented"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("file_edit_not_allowed");
+    expect(await readFile(join(projectRoot, "notes.md"), "utf8")).toBe("status: planned\n");
   });
 });

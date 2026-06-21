@@ -1,6 +1,6 @@
 import { execFile as nodeExecFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { appendEvent } from "../../core/src/index.js";
 
@@ -66,6 +66,13 @@ export interface TestExecutionRecord {
   exitCode: number;
   durationMs: number;
   outputSummary: string;
+}
+
+export interface FileEditRecord {
+  relativePath: string;
+  status: "applied";
+  replacements: number;
+  summary: string;
 }
 
 export interface ProjectIntake {
@@ -139,6 +146,13 @@ export interface ExecuteAllowedCommandInput {
   projectRoot: string;
   now: string;
   execFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
+}
+
+export interface ApplyControlledFileEditInput {
+  projectRoot: string;
+  relativePath: string;
+  find: string;
+  replace: string;
 }
 
 const COMMAND_ORDER: VerificationCommand["kind"][] = ["test", "build", "desktop_build", "lint", "doctor"];
@@ -239,6 +253,31 @@ export async function executeAllowedCommand(input: ExecuteAllowedCommandInput): 
       output: failure.output
     });
   }
+}
+
+export async function applyControlledFileEdit(input: ApplyControlledFileEditInput): Promise<FileEditRecord> {
+  const relativePath = normalizeRelativeEditPath(input.projectRoot, input.relativePath);
+  if (!input.find) {
+    throw new Error("Controlled file edit requires non-empty find text.");
+  }
+  if (sanitizeExecutionOutput(input.replace) !== input.replace) {
+    throw new Error("Controlled file edit replacement must not contain secret-like values.");
+  }
+
+  const targetPath = resolve(input.projectRoot, relativePath);
+  const current = await readFile(targetPath, "utf8");
+  const replacements = countOccurrences(current, input.find);
+  if (replacements !== 1) {
+    throw new Error(`Controlled file edit requires exactly one match; found ${replacements}.`);
+  }
+
+  await writeFile(targetPath, current.replace(input.find, input.replace), "utf8");
+  return {
+    relativePath,
+    status: "applied",
+    replacements,
+    summary: `Applied exact replacement in ${relativePath}`
+  };
 }
 
 export function createReviewSummary(input: ReviewSummaryInput): ReviewSummary {
@@ -345,6 +384,24 @@ export async function appendTestExecutionEvent(
     exit_code: execution.exitCode,
     duration_ms: execution.durationMs,
     output_summary: execution.outputSummary
+  });
+}
+
+export async function appendFileEditEvent(eventLogPath: string, intake: ProjectIntake, edit: FileEditRecord): Promise<void> {
+  await appendEvent(eventLogPath, {
+    id: `event_${intake.id}_edit_${slugify(edit.relativePath)}`,
+    time: new Date().toISOString(),
+    actor: "dore",
+    event_type: "task_updated",
+    entity_type: "task",
+    entity_id: intake.id,
+    summary: `Engineering file edit applied: ${edit.relativePath}`,
+    risk_level: "write",
+    refs: ["engineering_file_edit"],
+    relative_path: edit.relativePath,
+    status: edit.status,
+    replacements: edit.replacements,
+    edit_summary: sanitizeExecutionOutput(edit.summary)
   });
 }
 
@@ -537,6 +594,30 @@ function normalizeExecFailure(error: unknown): { exitCode: number; output: strin
     exitCode,
     output
   };
+}
+
+function normalizeRelativeEditPath(projectRoot: string, requestedPath: string): string {
+  const root = resolve(projectRoot);
+  const target = resolve(root, requestedPath);
+  const relativePath = relative(root, target);
+  if (!requestedPath.trim() || relativePath === "" || relativePath.startsWith("..") || resolve(root, relativePath) !== target) {
+    throw new Error("Controlled file edit path must stay inside the project root.");
+  }
+  return relativePath;
+}
+
+function countOccurrences(value: string, needle: string): number {
+  let count = 0;
+  let offset = 0;
+  while (offset < value.length) {
+    const index = value.indexOf(needle, offset);
+    if (index === -1) {
+      return count;
+    }
+    count += 1;
+    offset = index + needle.length;
+  }
+  return count;
 }
 
 async function defaultExecFile(command: string, args: string[], options?: { cwd?: string }): Promise<ExecFileResult> {

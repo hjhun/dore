@@ -155,7 +155,8 @@ Status:
 - Engineering task status is exposed through daemon `/status` and the desktop Dashboard.
 - Engineering task history is restored from persisted intake artifacts and append-only event logs across daemon restarts.
 - A controlled command executor skeleton can run allowed verification commands and log redacted outcomes against engineering tasks.
-- Remaining work is a controlled file-edit executor for small repo changes and linking review summaries back to generated intake artifacts.
+- A controlled file-edit executor can apply one exact replacement inside the project root and log redacted task update events.
+- M4 acceptance is implemented; next work is M5 Trading Watch and Dry-run.
 
 Deliverables:
 
@@ -165,12 +166,14 @@ Deliverables:
 - repo inspection workflow.
 - test detection and execution record.
 - controlled verification command executor.
+- controlled exact file-edit executor.
 
 Acceptance:
 
 - a user idea can produce a requirement draft and technical design draft.
 - a small repo change can be planned, implemented, tested, and logged.
 - executor command output is redacted before it reaches append-only task logs.
+- file edits are constrained to the project root and secret-like replacement values are rejected.
 
 ### M5: Trading Watch and Dry-run
 

@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M4, Development Agent MVP
-- Current task: controlled command executor complete; next is controlled file-edit executor
+- Current task: controlled file-edit executor implemented; verifying M4 completion
 
 ## Milestone Progress
 
@@ -73,6 +73,8 @@ Update it whenever development state changes.
 - [x] M4 executor command allowlist implemented.
 - [x] M4 executor output redaction implemented.
 - [x] M4 executor daemon route logs outcomes against engineering tasks.
+- [x] M4 controlled file-edit executor implemented.
+- [x] M4 file-edit daemon route logs task update events.
 
 ## M0 Checklist
 
@@ -163,7 +165,7 @@ Update it whenever development state changes.
 - [x] Engineering task history is restored from `memory/operations/engineering` and event logs.
 - [x] Allowed verification commands can run through the engineering task executor route.
 - [x] Executor output is redacted before being written to task logs.
-- [ ] Small repo change can be executed from the agent workflow and fully logged through daemon/task logs.
+- [x] Small repo change can be executed from the agent workflow and fully logged through daemon/task logs.
 
 ## Verification Log
 
@@ -245,6 +247,14 @@ Update it whenever development state changes.
 - 2026-06-22: Docs relative link check passed after M4 controlled executor docs update.
 - 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 - 2026-06-22: M4 controlled command executor pushed to `origin/codex/add-agent-development-guide` at commit `88e3f8b`.
+- 2026-06-22: M4 controlled file-edit executor tests added; TDD red phase confirmed for missing `applyControlledFileEdit`, `appendFileEditEvent`, and `POST /engineering/tasks/:id/apply-edit`.
+- 2026-06-22: M4 `task_updated` event contract test added for file-edit task logs.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts packages/contracts/src/contracts.test.ts` passed, 14 files and 63 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed, 14 files and 63 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M4 controlled file-edit executor work.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M4 controlled file-edit executor work.
+- 2026-06-22: Docs relative link check passed after M4 controlled file-edit executor docs update.
+- 2026-06-22: Secret-like scan found only the existing intentional fixture in `packages/core/src/event-log.test.ts`.
 
 ## Known Constraints
 
@@ -255,8 +265,8 @@ Update it whenever development state changes.
 
 ## Next Action
 
-Start M4 Development Agent MVP:
+Start M5 Trading Watch and Dry-run after committing M4 file-edit executor:
 
-1. Add a controlled file-edit executor for small repo changes.
-2. Connect review summaries to the generated intake artifacts.
-3. Keep executor command allowlists narrow as new workflows are added.
+1. Add watchlist and broker capability package tests.
+2. Keep `real_trading_enabled: false` as the default invariant.
+3. Add dry-run journal and risk manager before any real broker integration.

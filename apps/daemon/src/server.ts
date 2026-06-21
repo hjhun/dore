@@ -1,9 +1,11 @@
 import Fastify from "fastify";
 import { readdir, readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
-import type { ExecFileResult, PackageJsonLike, ProjectIntake } from "../../../packages/engineering/src/index.js";
+import { join, relative, resolve } from "node:path";
+import type { ExecFileResult, FileEditRecord, PackageJsonLike, ProjectIntake } from "../../../packages/engineering/src/index.js";
 import {
+  appendFileEditEvent,
   appendTestExecutionEvent,
+  applyControlledFileEdit,
   createTestExecutionRecord,
   executeAllowedCommand,
   runEngineeringIntake
@@ -228,6 +230,48 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
     });
   });
 
+  app.post("/engineering/tasks/:id/apply-edit", async (request, reply) => {
+    const payload = request.body as { path?: unknown; find?: unknown; replace?: unknown } | null;
+    const relativePath = typeof payload?.path === "string" ? payload.path.trim() : "";
+    const find = typeof payload?.find === "string" ? payload.find : "";
+    const replace = typeof payload?.replace === "string" ? payload.replace : "";
+    if (!isAllowedFileEdit(projectRoot, relativePath, find, replace)) {
+      return reply.code(400).send({
+        error: "file_edit_not_allowed"
+      });
+    }
+
+    const params = request.params as { id?: string };
+    const task = params.id ? engineeringTasks.get(params.id) : undefined;
+    if (!task) {
+      return reply.code(404).send({
+        error: "task_not_found"
+      });
+    }
+
+    let edit: FileEditRecord;
+    try {
+      edit = await applyControlledFileEdit({
+        projectRoot,
+        relativePath,
+        find,
+        replace
+      });
+    } catch {
+      return reply.code(400).send({
+        error: "file_edit_not_allowed"
+      });
+    }
+    await appendFileEditEvent(task.eventLogPath, task.intake, edit);
+
+    return reply.code(201).send({
+      task_id: task.intake.id,
+      task_status: task.status,
+      edit,
+      event_log: task.eventLogPath
+    });
+  });
+
   return app;
 }
 
@@ -235,6 +279,22 @@ function isAllowedEngineeringCommand(command: string): boolean {
   return ["pnpm test", "pnpm build", "pnpm build:desktop", "pnpm lint", "pnpm doctor"].includes(
     command.trim().replace(/\s+/g, " ")
   );
+}
+
+function isAllowedFileEdit(projectRoot: string, requestedPath: string, find: string, replace: string): boolean {
+  if (!requestedPath || !find || containsSecretLikeValue(replace)) {
+    return false;
+  }
+  const root = resolve(projectRoot);
+  const target = resolve(root, requestedPath);
+  const relativePath = relative(root, target);
+  return relativePath !== "" && !relativePath.startsWith("..") && resolve(root, relativePath) === target;
+}
+
+function containsSecretLikeValue(value: string): boolean {
+  return /\b(OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|TELEGRAM_BOT_TOKEN)=\S+/.test(value)
+    || /\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY))=\S+/.test(value)
+    || /\bsk-[A-Za-z0-9_-]+/.test(value);
 }
 
 async function restoreEngineeringTasks(

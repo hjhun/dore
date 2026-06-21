@@ -91,6 +91,7 @@ export const EventLogRecordSchema = z
     actor: z.enum(["user", "dore", "scheduler", "system"]),
     event_type: z.enum([
       "task_started",
+      "task_updated",
       "task_completed",
       "approval_requested",
       "approval_decided",
@@ -112,4 +113,3 @@ export type ModelSelectionRequest = z.infer<typeof ModelSelectionRequestSchema>;
 export type BrokerCapability = z.infer<typeof BrokerCapabilitySchema>;
 export type TradingSignal = z.infer<typeof TradingSignalSchema>;
 export type EventLogRecord = z.infer<typeof EventLogRecordSchema>;
-
