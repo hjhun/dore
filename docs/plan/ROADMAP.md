@@ -231,8 +231,9 @@ Status:
 - Broker credential fields accept only `secret_ref:` references.
 - Gate checks cover explicit enablement, official API verification, terms verification, broker credential references, dry-run history, kill switch, approval, and risk limits.
 - Approval and kill-switch control routes persist local gate controls and append trading audit events without creating real order paths.
+- M6 acceptance audit is documented in [MILESTONE_6_ACCEPTANCE_AUDIT.md](MILESTONE_6_ACCEPTANCE_AUDIT.md).
 - Official broker API and terms are still pending user input.
-- The next safe slice is a M6 acceptance audit while keeping real orders blocked.
+- The next safe slice requires user-provided broker/API details for connector planning while keeping real orders blocked.
 
 Prerequisites:
 

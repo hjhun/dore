@@ -9,14 +9,16 @@ Use this plan as the day-to-day development source of truth. The draft documents
 - [ROADMAP.md](ROADMAP.md): milestone roadmap and development order.
 - [MILESTONE_0_BOOTSTRAP.md](MILESTONE_0_BOOTSTRAP.md): first scaffold and verification target.
 - [MILESTONE_5_ACCEPTANCE_AUDIT.md](MILESTONE_5_ACCEPTANCE_AUDIT.md): trading watch and dry-run acceptance evidence.
+- [MILESTONE_6_ACCEPTANCE_AUDIT.md](MILESTONE_6_ACCEPTANCE_AUDIT.md): pilot real trading gate acceptance evidence.
 - [QUALITY_GATES.md](QUALITY_GATES.md): TDD, verification, and release gates.
 
 ## Current Development Focus
 
-Current focus: Milestone 6, pilot real trading acceptance audit.
+Current focus: broker/API details pending for future connector work.
 
 The next working slice must provide:
 
-- acceptance evidence for config gates, status gates, control routes, and blocked real-order paths.
-- explicit known boundaries for missing broker/API details.
-- verification that approval and kill-switch controls do not enable real trading by themselves.
+- source-cited official broker API and terms review.
+- connector design based on user-provided broker details.
+- secret-reference-only credential setup.
+- tests proving real order paths remain blocked until explicit connector gates pass.

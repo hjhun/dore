@@ -9,7 +9,7 @@ Update it whenever development state changes.
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
 - Active milestone: M6, Pilot Real Trading Preparation
-- Current task: M6 approval/kill-switch controls implemented; next is M6 acceptance audit
+- Current task: M6 accepted for pre-broker scope; waiting for broker/API details for connector planning
 
 ## Milestone Progress
 
@@ -98,6 +98,7 @@ Update it whenever development state changes.
 - [x] M6 risk limit gate is represented before real execution.
 - [x] M6 approval control route records audit events.
 - [x] M6 kill-switch control route persists across daemon restarts.
+- [x] M6 acceptance audit documented.
 
 ## M0 Checklist
 
@@ -225,6 +226,7 @@ Update it whenever development state changes.
 - [x] Kill-switch control changes are written to append-only trading events.
 - [x] Kill-switch control changes persist across daemon restarts.
 - [x] Missing official broker API details keep all real order paths blocked.
+- [x] M6 acceptance audit proves pre-broker scope acceptance criteria.
 
 ## Verification Log
 
@@ -371,6 +373,12 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M6 control routes.
 - 2026-06-22: Docs relative link check passed after M6 control route docs update.
 - 2026-06-22: Changed-file secret-like scan found no plaintext secret values after M6 control routes.
+- 2026-06-22: M6 acceptance audit documented in `docs/plan/MILESTONE_6_ACCEPTANCE_AUDIT.md`.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M6 acceptance audit, 15 files and 88 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M6 acceptance audit.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M6 acceptance audit.
+- 2026-06-22: Docs relative link check passed after M6 acceptance audit docs update.
+- 2026-06-22: Changed-file secret-like scan found no plaintext secret values after M6 acceptance audit.
 
 ## Known Constraints
 
@@ -383,5 +391,5 @@ Update it whenever development state changes.
 
 Continue M6 Pilot Real Trading Preparation:
 
-1. Add a M6 acceptance audit against roadmap acceptance.
-2. Keep all real broker/order paths blocked until user supplies official API details.
+1. Wait for user-provided official broker/API details before connector planning.
+2. Keep all real broker/order paths blocked until official API, terms, credentials, approval, and risk gates are satisfied.
