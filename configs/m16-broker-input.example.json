@@ -1,0 +1,28 @@
+{
+  "brokerName": "",
+  "targetMarkets": [],
+  "officialDocumentationRefs": [],
+  "officialTermsRefs": [],
+  "authenticationVerified": false,
+  "termsAndAccountConstraintsVerified": false,
+  "credentialRefs": {
+    "toss": {
+      "app_key_secret_ref": "secret_ref:brokers/toss/app_key",
+      "app_secret_secret_ref": "secret_ref:brokers/toss/app_secret",
+      "account_secret_ref": "secret_ref:brokers/toss/account"
+    }
+  },
+  "paperOrSandboxVerified": false,
+  "paperOrSandboxExplicitlyUnavailable": false,
+  "pilotRiskLimits": {
+    "max_order_krw_equivalent": 100000,
+    "max_daily_new_buy_krw_equivalent": 300000,
+    "max_daily_loss_krw_equivalent": 100000,
+    "max_position_pct": 10
+  },
+  "approvalPolicy": {
+    "approvalChannel": "desktop",
+    "killSwitchOwner": "user"
+  },
+  "explicitUserApprovalToStartM16": false
+}

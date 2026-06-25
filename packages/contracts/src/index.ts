@@ -32,6 +32,31 @@ export const TaskSchema = z.object({
     .optional()
 });
 
+export const ApprovalRequestSchema = z.object({
+  id: z.string().min(1),
+  task_id: z.string().min(1),
+  title: z.string().min(1),
+  summary_for_user: z.string().min(1),
+  risk_level: z.enum(["write", "execute", "trade", "critical"]),
+  requested_action: z.object({
+    kind: z.enum(["file_write", "command_execute", "external_send", "broker_order", "config_change"]),
+    target: z.string().min(1),
+    dry_run_available: z.boolean(),
+    reversible: z.boolean()
+  }),
+  created_at: z.string().min(1),
+  expires_at: z.string().min(1),
+  state: z.enum(["pending", "approved", "rejected", "expired", "cancelled"]),
+  decision: z
+    .object({
+      decided_at: z.string().optional(),
+      decided_by: z.string().optional(),
+      reason: z.string().optional()
+    })
+    .optional(),
+  audit_refs: z.array(z.string())
+});
+
 export const ModelSelectionRequestSchema = z.object({
   id: z.string().min(1).optional(),
   task_id: z.string().min(1).optional(),
@@ -43,6 +68,24 @@ export const ModelSelectionRequestSchema = z.object({
   requires_tools: z.boolean(),
   requires_json: z.boolean(),
   preferred_provider: z.enum(["openai", "claude", "gemini", "auto"])
+});
+
+export const LlmUsageRecordSchema = z.object({
+  id: z.string().min(1),
+  task_id: z.string().min(1).optional(),
+  provider: z.enum(["openai", "claude", "gemini"]),
+  model: z.string().min(1),
+  auth_mode: z.enum(["api_key", "oauth"]),
+  category: z.enum(["assistant", "engineering", "review", "briefing", "trading_report", "background"]),
+  started_at: z.string().min(1),
+  ended_at: z.string().min(1),
+  input_tokens: z.number().nonnegative(),
+  output_tokens: z.number().nonnegative(),
+  cache_tokens: z.number().nonnegative(),
+  estimated_cost_usd: z.number().nonnegative(),
+  latency_ms: z.number().nonnegative(),
+  status: z.enum(["success", "failed", "cancelled"]),
+  error_code: z.string().optional()
 });
 
 export const BrokerCapabilitySchema = z.object({
@@ -109,7 +152,9 @@ export const EventLogRecordSchema = z
   .passthrough();
 
 export type Task = z.infer<typeof TaskSchema>;
+export type ApprovalRequest = z.infer<typeof ApprovalRequestSchema>;
 export type ModelSelectionRequest = z.infer<typeof ModelSelectionRequestSchema>;
+export type LlmUsageRecord = z.infer<typeof LlmUsageRecordSchema>;
 export type BrokerCapability = z.infer<typeof BrokerCapabilitySchema>;
 export type TradingSignal = z.infer<typeof TradingSignalSchema>;
 export type EventLogRecord = z.infer<typeof EventLogRecordSchema>;

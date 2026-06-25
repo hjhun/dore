@@ -1,0 +1,400 @@
+# Development
+
+## Inputs Used
+
+- Prompt: 작성한 로드맵대로 개발 진행.
+- Requirements: `docs/plan/ROADMAP.md` M7-M21 roadmap slices.
+- Plan: `docs/plan/README.md`, `docs/plan/REQUIREMENTS_TRACE.md`.
+- Design: `docs/drafts/28_RUNTIME_CONTRACTS.md`, `docs/drafts/06_TECHNICAL_DESIGN.md`.
+- Dashboard: `.dev/DASHBOARD.md`.
+
+## Implementation Summary
+
+- M9:
+  - Added `runBriefingJob` for manual/scheduled briefing execution.
+  - Added retry schedule handling and failed-attempt/final-failure event logs.
+  - Added shared briefing delivery records containing Telegram summary and dashboard JSON path.
+  - Added source freshness metadata to briefing dashboard records.
+  - Added scheduler job handler execution and success/failure result reporting.
+  - Updated daemon `POST /briefings/run` to support scheduled trigger semantics.
+- M10:
+  - Added daemon-backed Telegram command context for `/status`, `/briefing`, `/usage`, and `/stop`.
+  - Added HTTP daemon client for Telegram command handlers.
+  - Added daily briefing push from shared briefing delivery records.
+  - Added task completion, task failure, and approval notification formatting/delivery helpers.
+  - Added Telegram delivery failure JSONL logging with bot token, bearer token, and secret reference redaction.
+  - Updated daemon Telegram readiness status to honor configured token env and allowlist without exposing tokens.
+- M11:
+  - Added daemon `/logs/recent` across event, usage, and trading JSONL logs.
+  - Expanded desktop dashboard with critical strip, today top 3, active work, daily briefing, usage, memory updates, logs, chat, and task/schedule surfaces.
+  - Added daemon status aggregation for `/status`, `/briefings/latest`, `/usage/summary`, `/memory/index`, and `/logs/recent`.
+  - Added approval decision client hook for persisted daemon approval actions.
+  - Added categorized log filtering and secret-safe settings display.
+  - Added basic local chat slash commands for `/usage`, `/status`, `/reset`, and `/new`.
+- M12:
+  - Added Markdown/frontmatter memory writer for profile, project, topic, decision, routine, trading, engineering, and log records.
+  - Added sensitive-memory approval request flow before wiki persistence.
+  - Added raw source storage under `memory/raw/inbox` with wiki `source_refs`.
+  - Added superseded update flow, wiki index update/search, stale metadata, and conflict notes.
+  - Added operational memory persistence for active context, tasks, reminders, open questions, and approvals.
+  - Added daemon `POST /memory/records` for normal writes and sensitive approval queueing.
+- M13:
+  - Added default engineering tool registry for file, command, repo, and documentation operations.
+  - Added development workflow steps for intake, plan, patch, verify, review, summarize, and memory reflection.
+  - Added code-review report ordering by behavioral severity with file/line references.
+  - Added engineering memory reflection into project and decision records.
+  - Added high-risk approval assessment for broad file edits, destructive commands, and external mutations.
+- M14:
+  - Added market data source status/freshness checks for Korea and US watchlists.
+  - Added strategy templates for momentum, mean reversion, portfolio rebalancing, event watch, and long-term thesis tracking.
+  - Added deterministic strategy signal generation from recorded quote inputs.
+  - Added paper-mode journal entries with explicit no-broker-submission flag.
+  - Added trading journal summary for dry-run and paper entries.
+  - Added daemon and desktop trading status visibility for market data and paper journal summaries.
+- M15:
+  - Added final MVP acceptance audit against draft acceptance criteria.
+  - Added eval/manual runbook for memory, engineering, review, trading, proposal, and daily briefing scenarios.
+  - Added Hermes MVP parity and slash command checklist.
+  - Added session lifecycle plan for reset, resume, stop, queueing, interruption, and crash recovery.
+  - Added local onboarding guide plus security and secret exposure audit.
+  - Updated roadmap/status documents to mark M0-M15 local MVP complete and M16-M17 post-MVP broker work blocked on user inputs.
+- M16 preparation:
+  - Added broker connector input packet for official documentation, terms/account constraints, credential references, risk limits, approval policy, and start-gate checks.
+  - Linked the input packet from the plan README, roadmap, project audit, and dashboard.
+  - Added `assessBrokerConnectorInputPacket` readiness evaluator in `packages/trading`.
+  - Added tests for missing M16 inputs, complete official/secret-ref inputs, and raw credential rejection.
+  - Added JSON input packet loader, example packet, and `trading:m16-check` CLI for local start-gate validation.
+  - Kept broker connector implementation blocked until the packet is completed and explicitly approved.
+- Roadmap update:
+  - Kept M16/M17 broker work blocked by external inputs.
+  - Added M18 Local Product Hardening and Desktop Operations.
+  - Added M19 Daemon Reliability and Local Persistence Hardening.
+  - Added M20 Memory Quality, Review, and Knowledge Hygiene.
+  - Added M21 Development Agent Workflow Depth.
+  - Updated current development focus to M18, then to M19 after M18 desktop operations completed.
+- M18 desktop operations:
+  - Added desktop config validation panel derived from provider, Telegram, memory, and trading gate state.
+  - Added Memory Explorer detail panel for wiki path, type/status, source refs, stale state, conflict notes, and sensitivity.
+  - Added approval risk context with requested action, dry-run availability, and reversibility.
+  - Added log text search in addition to existing category filters.
+  - Updated task/schedule detail labels and daemon memory-index metadata parsing.
+  - Added runtime task cancellation from the desktop Tasks & Schedules panel through the daemon task API.
+  - Added scheduler recent-run metadata in daemon `/status` and rendered last/recent run details in desktop.
+  - Added log date filtering and preserved `/logs/recent` timestamp metadata in desktop status aggregation.
+- M19 daemon reliability:
+  - Added structured daemon health report evaluation for required config and optional provider/Telegram credential readiness.
+  - Added daemon `GET /health` and `/status.health` summary without exposing credential values.
+  - Refactored `doctor` CLI to use the same health evaluator and return non-zero only for required health failures.
+  - Added desktop health summary mapping and rendered daemon health in the Dashboard daemon panel.
+  - Added Telegram `/status` health visibility through the daemon-backed command context.
+  - Added scheduler recovery fields for next run, consecutive failure count, and retry status.
+  - Added failed briefing event detection for scheduler recovery state.
+  - Added desktop scheduler mapping and rendering for next run, failure count, and retry status.
+  - Added reusable core JSON/JSONL persistence helpers.
+  - Moved runtime task and approval JSON saves onto an atomic replace boundary.
+  - Moved runtime event JSONL appends behind a shared append helper.
+  - Documented runtime state backup/recovery for memory, tasks, approvals, logs, and local auth/token diagnostics.
+- M20 memory quality:
+  - Added duplicate memory suggestions for active records with matching normalized body content.
+  - Added stale-memory review queue with source references and last-seen timestamps.
+  - Added conflict review queue from Markdown conflict notes.
+  - Added ranked memory search that considers match quality, active/stale state, record type, source references, and recency.
+  - Added daemon `GET /memory/quality` for duplicate, stale, and conflict review queues.
+  - Added desktop status aggregation and Memory Explorer quality summary for duplicate/stale/conflict counts and candidate titles.
+  - Added memory maintenance eval scenarios for duplicate review, stale review, conflict review, ranked search, and sensitive-memory approval guard.
+- M21 development-agent workflow depth:
+  - Added deterministic development task stage summaries from the existing engineering workflow.
+  - Exposed plan, patch, verify, review, summarize, and memory-reflection stages through daemon `/status.engineering.tasks`.
+  - Mapped engineering stages into desktop status and rendered them in the Dashboard Engineering panel.
+  - Added failed verification summaries with likely next action generation from `TestExecutionRecord`.
+  - Stored failed verification summaries in engineering task events and daemon task status.
+  - Rendered failed verification summary, next action, and sanitized failure output in the desktop Engineering panel.
+  - Added code-review report event persistence with existing event-log contract semantics.
+  - Added daemon task status and desktop Engineering panel visibility for severity-ordered code-review findings.
+  - Added workflow risk review records for broad edits, destructive commands, external mutations, and single-file edits.
+  - Exposed risk review context through daemon task status and the desktop Engineering panel.
+  - Added explicit decision, regression, and follow-up task sections to engineering memory reflection records.
+  - Added engineering follow-up memory records for completed development task reflections.
+- M8:
+  - Added `LlmUsageRecordSchema`.
+  - Added provider registry for OpenAI, Claude, and Gemini API-key availability.
+  - Added model gateway generate flow behind injected provider clients.
+  - Added usage/cost/latency JSONL records for success, unavailable, blocked, and failed calls.
+  - Added monthly soft-limit warning and hard-threshold blocking behavior.
+  - Added provider status detail to daemon `/status` without exposing credentials.
+- M7:
+- Added `ApprovalRequestSchema` and type export.
+- Added local file-backed runtime task and approval state helpers under `packages/core`.
+- Added daemon runtime endpoints:
+  - `GET /tasks`
+  - `GET /tasks/:id`
+  - `POST /tasks`
+  - `POST /tasks/:id/cancel`
+  - `GET /approvals`
+  - `POST /approvals`
+  - `POST /approvals/:id/approve`
+  - `POST /approvals/:id/reject`
+  - `GET /briefings/latest`
+  - `POST /briefings/run`
+  - `GET /usage/summary`
+  - `GET /memory/index`
+- Added runtime endpoint protection for unauthenticated non-local requests.
+- Added `/status.runtime` visibility for runtime tasks and approvals.
+- Added runtime audit events for task and approval mutations.
+
+## Files Changed
+
+- `.dev/DASHBOARD.md`
+- `.dev/progress/developer.md`
+- `apps/daemon/src/runtime-api.test.ts`
+- `apps/daemon/src/status.test.ts`
+- `apps/daemon/src/server.ts`
+- `apps/desktop/src/renderer/Dashboard.test.tsx`
+- `apps/desktop/src/renderer/Dashboard.tsx`
+- `apps/desktop/src/renderer/daemon-status.test.ts`
+- `apps/desktop/src/renderer/daemon-status.ts`
+- `packages/memory/src/bootstrap.test.ts`
+- `packages/memory/src/index.ts`
+- `packages/engineering/src/intake.test.ts`
+- `packages/engineering/src/index.ts`
+- `packages/trading/src/trading.test.ts`
+- `packages/trading/src/index.ts`
+- `apps/desktop/src/renderer/Dashboard.test.tsx`
+- `apps/desktop/src/renderer/Dashboard.tsx`
+- `apps/desktop/src/renderer/daemon-status.test.ts`
+- `apps/desktop/src/renderer/daemon-status.ts`
+- `packages/briefing/src/briefing.test.ts`
+- `packages/briefing/src/index.ts`
+- `packages/contracts/src/contracts.test.ts`
+- `packages/contracts/src/index.ts`
+- `packages/core/src/index.ts`
+- `packages/model-gateway/src/routing.test.ts`
+- `packages/model-gateway/src/index.ts`
+- `packages/scheduler/src/scheduler.test.ts`
+- `packages/scheduler/src/index.ts`
+- `packages/telegram/src/telegram.test.ts`
+- `packages/telegram/src/index.ts`
+- `docs/plan/EVAL_RUNBOOK.md`
+- `docs/plan/README.md`
+- `docs/plan/ROADMAP.md`
+- `docs/plan/PROJECT_STATUS_AUDIT.md`
+- `apps/daemon/src/runtime-api.test.ts`
+- `apps/desktop/src/renderer/daemon-status.test.ts`
+- `packages/core/src/event-log.test.ts`
+- `packages/core/src/index.ts`
+- `docs/plan/LOCAL_ONBOARDING_SECURITY.md`
+- `packages/memory/src/bootstrap.test.ts`
+- `packages/memory/src/index.ts`
+- `docs/plan/README.md`
+- `docs/plan/ROADMAP.md`
+- `docs/plan/PROJECT_STATUS_AUDIT.md`
+- `docs/plan/REQUIREMENTS_TRACE.md`
+- `docs/plan/MILESTONE_15_MVP_ACCEPTANCE_AUDIT.md`
+- `docs/plan/EVAL_RUNBOOK.md`
+- `docs/plan/HERMES_MVP_PARITY.md`
+- `docs/plan/SESSION_LIFECYCLE.md`
+- `docs/plan/LOCAL_ONBOARDING_SECURITY.md`
+- `docs/plan/M16_BROKER_CONNECTOR_INPUT_PACKET.md`
+- `configs/m16-broker-input.example.json`
+- `apps/daemon/src/trading-m16-check.ts`
+- `apps/daemon/src/trading-m16-check.test.ts`
+- `apps/daemon/src/health.ts`
+- `apps/daemon/src/doctor.ts`
+- `apps/daemon/src/status.test.ts`
+- `apps/daemon/src/server.ts`
+- `apps/desktop/src/renderer/Dashboard.tsx`
+- `apps/desktop/src/renderer/daemon-status.test.ts`
+- `apps/desktop/src/renderer/daemon-status.ts`
+- `packages/telegram/src/telegram.test.ts`
+- `packages/telegram/src/index.ts`
+
+## TDD And Tests
+
+- Test added or updated: `apps/daemon/src/runtime-api.test.ts`, `apps/daemon/src/status.test.ts`, `packages/contracts/src/contracts.test.ts`, `packages/model-gateway/src/routing.test.ts`.
+- Red result:
+  - M7 targeted test failed with missing `ApprovalRequestSchema` and 404 responses for M7 runtime endpoints.
+  - M8 targeted tests failed with missing provider gateway APIs, missing `LlmUsageRecordSchema`, missing soft-limit warning payload, and missing daemon provider status detail.
+  - M9 targeted tests failed with missing `runBriefingJob`, missing `executeScheduledJob`, and manual-only daemon briefing trigger behavior.
+  - M10 targeted tests failed with missing daemon Telegram context, HTTP client, briefing push, notifications, and redaction helpers.
+  - M11 targeted tests failed with missing `/logs/recent`, desktop status aggregation, product sections, approval client hook, log filters, and chat surface.
+  - M12 targeted tests failed with missing memory writer, operational writer, index/search, stale/conflict marking, and daemon memory route.
+  - M13 targeted tests failed with missing tool registry, development workflow, review ordering, memory reflection, and high-risk approval assessment APIs.
+  - M14 targeted tests failed with missing market data source status, strategy templates, paper journal, trading journal summary, and status/dashboard visibility.
+- M15 documentation gate:
+  - Final MVP acceptance, eval, Hermes parity, session lifecycle, onboarding, and security documents were added.
+  - Roadmap, requirement trace, project audit, and dashboard now identify M0-M15 as local MVP complete.
+- Green result: targeted tests passed after implementation.
+- Broader verification:
+  - `npx --yes pnpm@11.8.0 test`
+  - `npx --yes pnpm@11.8.0 build`
+  - `npx --yes pnpm@11.8.0 build:desktop`
+- M15 final verification:
+  - docs/plan relative link check passed, 27 links checked.
+  - `git diff --check` passed.
+  - `npx --yes pnpm@11.8.0 test` passed, 16 files and 135 tests.
+  - `npx --yes pnpm@11.8.0 build` passed.
+  - `npx --yes pnpm@11.8.0 build:desktop` passed.
+- M20 quality visibility:
+  - red phase: targeted daemon/desktop tests failed because `GET /memory/quality`, desktop quality mapping, and Memory Explorer quality summary were missing.
+  - green phase: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/runtime-api.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after adding daemon and desktop quality visibility, 17 files and 156 tests.
+  - broader verification:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 28 checked links in current status docs
+    - `npx --yes pnpm@11.8.0 doctor`
+- M21 stage visibility:
+  - red phase: targeted engineering/desktop tests failed because engineering task stages were missing from daemon status, desktop mapping, and the Engineering panel.
+  - green phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after adding stage visibility, 17 files and 157 tests.
+  - broader verification:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 28 checked links in current status docs
+    - `npx --yes pnpm@11.8.0 doctor`
+- M21 failed verification summary:
+  - red phase: targeted engineering/desktop tests failed because failed verification summary generation, daemon `failed_verification`, desktop mapping, and Engineering panel rendering were missing.
+  - green phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after adding failed verification summaries, 17 files and 160 tests.
+  - broader verification:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 28 checked links in current status docs
+    - `npx --yes pnpm@11.8.0 doctor`
+- M21 code-review report visibility:
+  - red phase: targeted engineering/desktop tests failed because code-review report event persistence, daemon review-report route, desktop mapping, and Engineering panel rendering were missing.
+  - green phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after adding code-review report visibility, 17 files and 163 tests.
+  - broader verification:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 28 checked links in current status docs
+    - `npx --yes pnpm@11.8.0 doctor`
+- M21 workflow risk visibility:
+  - red phase: targeted engineering/desktop tests failed because workflow risk review creation, daemon risk-review route, desktop mapping, and Engineering panel rendering were missing.
+  - green phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after adding risk review visibility, 17 files and 166 tests.
+  - broader verification:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 28 checked links in current status docs
+    - `npx --yes pnpm@11.8.0 doctor`
+- M21 memory reflection:
+  - red phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` failed because engineering memory reflection records did not include explicit decisions, regressions, and follow-up task sections.
+  - green phase: same command passed after adding decision sections and engineering follow-up records, 17 files and 167 tests.
+  - broader verification:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 31 links checked
+    - `npx --yes pnpm@11.8.0 doctor`
+- M16 preparation verification:
+  - docs/plan relative link check passed, 33 links checked.
+  - `git diff --check` passed.
+  - `npx --yes pnpm@11.8.0 test` passed, 16 files and 135 tests.
+  - `npx --yes pnpm@11.8.0 build` passed.
+  - `npx --yes pnpm@11.8.0 build:desktop` passed.
+- M16 readiness evaluator:
+  - Red result: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts` failed with missing `assessBrokerConnectorInputPacket`.
+  - Green result: same command passed after adding the readiness evaluator, 16 files and 138 tests.
+  - docs/plan relative link check passed, 33 links checked.
+  - `git diff --check` passed.
+  - `npx --yes pnpm@11.8.0 test` passed, 16 files and 138 tests.
+  - `npx --yes pnpm@11.8.0 build` passed.
+  - `npx --yes pnpm@11.8.0 build:desktop` passed.
+- M16 CLI validator:
+  - Red result: targeted tests failed with missing `loadBrokerConnectorInputPacketFile` and missing `apps/daemon/src/trading-m16-check.ts`.
+  - Green result: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts apps/daemon/src/trading-m16-check.test.ts` passed, 17 files and 142 tests.
+  - Manual check: `npx --yes pnpm@11.8.0 trading:m16-check configs/m16-broker-input.example.json` returned blocked with exit code 1 as expected.
+  - docs/plan relative link check passed, 33 links checked.
+  - `git diff --check` passed.
+  - `npx --yes pnpm@11.8.0 test` passed, 17 files and 142 tests.
+  - `npx --yes pnpm@11.8.0 build` passed.
+  - `npx --yes pnpm@11.8.0 build:desktop` passed.
+- M18 desktop operations:
+  - Red result: desktop targeted tests failed for missing Config Validation, Memory Explorer details, log text search, approval action context, and mapper detail fields.
+  - Green result: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts` passed, 17 files and 144 tests.
+  - Red result: daemon runtime API test failed because `/memory/index` did not expose memory metadata.
+  - Green result: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/runtime-api.test.ts` passed, 17 files and 144 tests.
+  - Red result: task/schedule targeted tests failed for missing desktop cancellation action, daemon task client, scheduler run metadata mapping, and daemon scheduler recent-run status.
+  - Green result: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts apps/daemon/src/runtime-api.test.ts` passed, 17 files and 146 tests.
+  - Red result: log date-filter targeted tests failed for missing `Log date` input and missing log `time` mapping.
+  - Green result: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts` passed, 17 files and 147 tests.
+  - docs/plan relative link check passed, 32 links checked.
+  - `git diff --check` passed.
+  - `npx --yes pnpm@11.8.0 test` passed, 17 files and 147 tests.
+  - `npx --yes pnpm@11.8.0 build` passed.
+  - `npx --yes pnpm@11.8.0 build:desktop` passed.
+- M19 health/doctor:
+  - Red result: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/status.test.ts` failed for missing `/health`, missing `/status.health`, and missing `runDoctor`.
+  - Green result: same command passed after adding structured health evaluation and doctor integration, 17 files and 150 tests.
+  - Red result: desktop and Telegram targeted tests failed for missing health summary mapping and missing `/status` health text.
+  - Green result: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/daemon-status.test.ts` passed, 17 files and 150 tests.
+  - Green result: `npx --yes pnpm@11.8.0 test -- packages/telegram/src/telegram.test.ts` passed, 17 files and 150 tests.
+  - Broader verification passed:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 32 links checked
+    - `npx --yes pnpm@11.8.0 doctor`
+- M19 scheduler recovery:
+  - Red result: targeted daemon and desktop tests failed for missing `next_run_at`, `failure_count`, `retry_status`, and desktop mapping.
+  - Green result: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/runtime-api.test.ts` passed after daemon scheduler recovery fields, 17 files and 150 tests.
+  - Green result: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/daemon-status.test.ts` passed after desktop scheduler recovery mapping, 17 files and 150 tests.
+  - Green result: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/status.test.ts` passed after failed-run recovery coverage, 17 files and 151 tests.
+  - Broader verification passed:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 32 links checked
+    - `npx --yes pnpm@11.8.0 doctor`
+- M19 persistence boundary:
+  - Red result: `npx --yes pnpm@11.8.0 test -- packages/core/src/event-log.test.ts` failed for missing reusable atomic JSON/JSONL helpers.
+  - Green result: same command passed after adding core persistence helpers and moving runtime task/approval/event writes through them, 17 files and 153 tests.
+  - Broader verification passed:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 32 links checked
+    - `npx --yes pnpm@11.8.0 doctor`
+- M19 runbook documentation:
+  - Added runtime state backup/recovery and local auth/token diagnostics to `docs/plan/LOCAL_ONBOARDING_SECURITY.md`.
+  - Broader verification passed:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 33 links checked
+    - `npx --yes pnpm@11.8.0 doctor`
+- M20 memory quality:
+  - Red result: `npx --yes pnpm@11.8.0 test -- packages/memory/src/bootstrap.test.ts` failed for missing `reviewMemoryQuality` and ranked search metadata.
+  - Green result: same command passed after adding duplicate/stale/conflict review queues and ranked memory search, 17 files and 155 tests.
+  - Broader verification passed:
+    - `npx --yes pnpm@11.8.0 test`
+    - `npx --yes pnpm@11.8.0 build`
+    - `npx --yes pnpm@11.8.0 build:desktop`
+    - `git diff --check`
+    - docs/plan relative link check, 33 links checked
+    - `npx --yes pnpm@11.8.0 doctor`
+
+## Code Quality Notes
+
+- Style: follows existing TypeScript/Fastify route style and existing local JSON/JSONL persistence pattern.
+- Static analysis: TypeScript build passes.
+- Thread safety: state is persisted per request through file reads/writes; this is acceptable for local MVP runtime and can be strengthened with a lock/SQLite in later milestones if concurrent writes become a problem.
+- Design patterns: no new broad abstraction beyond small runtime store helpers.
+
+## Risks And Blockers
+
+- Runtime state is JSON file-backed and not transactional.
+- M16 broker connector work remains blocked until the user supplies official broker/API documentation, API terms and account constraints, credential references, desired pilot risk limits, and explicit approval policy.
+- M18-M21 local hardening is complete without broker/API inputs; real trading must remain blocked.

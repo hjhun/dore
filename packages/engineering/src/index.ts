@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { appendEvent } from "../../core/src/index.js";
+import { writeMemoryRecord } from "../../memory/src/index.js";
 
 const execFileAsync = promisify(nodeExecFile);
 
@@ -65,6 +66,13 @@ export interface TestExecutionRecord {
   status: "passed" | "failed";
   exitCode: number;
   durationMs: number;
+  outputSummary: string;
+}
+
+export interface FailedVerificationSummary {
+  command: string;
+  summary: string;
+  likelyNextAction: string;
   outputSummary: string;
 }
 
@@ -155,6 +163,80 @@ export interface ApplyControlledFileEditInput {
   replace: string;
 }
 
+export interface EngineeringTool {
+  id: string;
+  category: "file" | "command" | "repo" | "documentation";
+  description: string;
+  allowedTargets: string[];
+  approvalRequiredFor: string[];
+}
+
+export interface EngineeringToolRegistry {
+  tools: EngineeringTool[];
+}
+
+export type DevelopmentWorkflowStepKind = "intake" | "plan" | "patch" | "verify" | "review" | "summarize" | "memory_reflection";
+
+export interface DevelopmentWorkflow {
+  runtimeTaskId: string;
+  createdAt: string;
+  steps: Array<{
+    kind: DevelopmentWorkflowStepKind;
+    title: string;
+    taskLogEvent: "task_started" | "task_updated" | "task_completed";
+  }>;
+}
+
+export type DevelopmentTaskStageStatus = "pending" | "in_progress" | "completed" | "blocked";
+
+export interface DevelopmentTaskStage {
+  kind: DevelopmentWorkflowStepKind;
+  title: string;
+  status: DevelopmentTaskStageStatus;
+}
+
+export interface CodeReviewFindingInput {
+  category: "bug" | "regression" | "missing_test" | "risk" | "style";
+  severity: "critical" | "high" | "medium" | "low";
+  file: string;
+  line: number;
+  message: string;
+}
+
+export interface CodeReviewFinding extends CodeReviewFindingInput {
+  reference: string;
+}
+
+export interface CodeReviewReport {
+  findings: CodeReviewFinding[];
+}
+
+export interface ReflectEngineeringMemoryInput {
+  memoryRoot: string;
+  intake: ProjectIntake;
+  review: ReviewSummary;
+  now: string;
+}
+
+export interface ReflectEngineeringMemoryResult {
+  projectPath: string;
+  decisionPath: string;
+  followUpPath: string;
+}
+
+export interface EngineeringActionRiskInput {
+  kind: "single_file_edit" | "broad_file_edit" | "destructive_command" | "external_mutation";
+  target: string;
+}
+
+export interface EngineeringActionRisk {
+  approvalRequired: boolean;
+  riskLevel: "write" | "execute" | "critical";
+  reason: string;
+}
+
+export interface EngineeringRiskReview extends EngineeringActionRiskInput, EngineeringActionRisk {}
+
 const COMMAND_ORDER: VerificationCommand["kind"][] = ["test", "build", "desktop_build", "lint", "doctor"];
 const SCRIPT_BY_KIND: Record<VerificationCommand["kind"], string> = {
   test: "test",
@@ -163,6 +245,228 @@ const SCRIPT_BY_KIND: Record<VerificationCommand["kind"], string> = {
   lint: "lint",
   doctor: "doctor"
 };
+
+export function createDefaultToolRegistry(): EngineeringToolRegistry {
+  return {
+    tools: [
+      {
+        id: "file.read",
+        category: "file",
+        description: "Read project files for planning and review.",
+        allowedTargets: ["project_root"],
+        approvalRequiredFor: []
+      },
+      {
+        id: "file.edit.controlled",
+        category: "file",
+        description: "Apply narrow exact replacements inside the project root.",
+        allowedTargets: ["project_root"],
+        approvalRequiredFor: ["broad_file_edit", "secret_write"]
+      },
+      {
+        id: "command.verify",
+        category: "command",
+        description: "Run allowlisted verification commands.",
+        allowedTargets: ["pnpm test", "pnpm build", "pnpm build:desktop", "pnpm lint", "pnpm doctor"],
+        approvalRequiredFor: ["destructive_command"]
+      },
+      {
+        id: "repo.inspect",
+        category: "repo",
+        description: "Inspect branch and changed files.",
+        allowedTargets: ["git status", "git branch"],
+        approvalRequiredFor: []
+      },
+      {
+        id: "documentation.write",
+        category: "documentation",
+        description: "Write requirements, design, changelog, and memory reflection records.",
+        allowedTargets: ["memory/operations", "memory/wiki", "docs"],
+        approvalRequiredFor: ["external_mutation"]
+      }
+    ]
+  };
+}
+
+export function createDevelopmentWorkflow(input: {
+  intake: ProjectIntake;
+  runtimeTaskId: string;
+  now: string;
+}): DevelopmentWorkflow {
+  return {
+    runtimeTaskId: input.runtimeTaskId,
+    createdAt: input.now,
+    steps: [
+      { kind: "intake", title: `Intake: ${input.intake.projectName}`, taskLogEvent: "task_started" },
+      { kind: "plan", title: "Prepare requirements, design, and change plan", taskLogEvent: "task_updated" },
+      { kind: "patch", title: "Apply focused implementation patch", taskLogEvent: "task_updated" },
+      { kind: "verify", title: "Run detected verification commands", taskLogEvent: "task_updated" },
+      { kind: "review", title: "Review findings by severity", taskLogEvent: "task_updated" },
+      { kind: "summarize", title: "Summarize outcome and residual risks", taskLogEvent: "task_completed" },
+      { kind: "memory_reflection", title: "Reflect durable engineering knowledge into memory", taskLogEvent: "task_completed" }
+    ]
+  };
+}
+
+export function summarizeDevelopmentTaskStages(input: {
+  intake: ProjectIntake;
+  taskStatus: "planned" | "completed" | "failed";
+}): DevelopmentTaskStage[] {
+  const workflow = createDevelopmentWorkflow({
+    intake: input.intake,
+    runtimeTaskId: input.intake.id,
+    now: input.intake.executionRecord.generatedAt
+  });
+  return workflow.steps.map((step) => ({
+    kind: step.kind,
+    title: step.title,
+    status: stageStatusForTask(step.kind, input.taskStatus)
+  }));
+}
+
+function stageStatusForTask(kind: DevelopmentWorkflowStepKind, taskStatus: "planned" | "completed" | "failed"): DevelopmentTaskStageStatus {
+  if (taskStatus === "completed") {
+    return "completed";
+  }
+  if (taskStatus === "failed") {
+    if (kind === "intake" || kind === "plan" || kind === "patch") {
+      return "completed";
+    }
+    return kind === "verify" ? "blocked" : "pending";
+  }
+  if (kind === "intake") {
+    return "completed";
+  }
+  return kind === "plan" ? "in_progress" : "pending";
+}
+
+export function createCodeReviewReport(input: { findings: CodeReviewFindingInput[] }): CodeReviewReport {
+  const categoryRank: Record<CodeReviewFindingInput["category"], number> = {
+    bug: 0,
+    regression: 1,
+    missing_test: 2,
+    risk: 3,
+    style: 4
+  };
+  const severityRank: Record<CodeReviewFindingInput["severity"], number> = {
+    critical: 0,
+    high: 1,
+    medium: 2,
+    low: 3
+  };
+  return {
+    findings: input.findings
+      .map((finding) => ({
+        ...finding,
+        reference: `${finding.file}:${finding.line}`
+      }))
+      .sort(
+        (left, right) =>
+          categoryRank[left.category] - categoryRank[right.category] ||
+          severityRank[left.severity] - severityRank[right.severity] ||
+          left.reference.localeCompare(right.reference)
+      )
+  };
+}
+
+export async function reflectEngineeringMemory(
+  input: ReflectEngineeringMemoryInput
+): Promise<ReflectEngineeringMemoryResult> {
+  const decisions = input.review.findings.length > 0 ? input.review.findings.join("; ") : `Review status: ${input.review.status}`;
+  const regressions = input.review.verification.failed.join(", ") || "none";
+  const followUpTasks = input.review.residualRisks.join("; ") || "none";
+  const project = await writeMemoryRecord({
+    memoryRoot: input.memoryRoot,
+    type: "project",
+    title: input.intake.projectName,
+    body: [
+      `Engineering task: ${input.intake.id}`,
+      `Review status: ${input.review.status}`,
+      `Verification passed: ${input.review.verification.passed.join(", ") || "none"}`,
+      `Verification failed: ${input.review.verification.failed.join(", ") || "none"}`,
+      `Follow-up tasks: ${followUpTasks}`
+    ].join("\n\n"),
+    now: input.now,
+    tags: ["engineering", "project"],
+    sourceRefs: [input.intake.id],
+    approved: true
+  });
+  const decision = await writeMemoryRecord({
+    memoryRoot: input.memoryRoot,
+    type: "decision",
+    title: `Engineering review summary: ${input.review.status}`,
+    body: [
+      `Project: ${input.intake.projectName}`,
+      `Decisions: ${decisions}`,
+      `Regressions: ${regressions}`,
+      `Follow-up tasks: ${followUpTasks}`
+    ].join("\n\n"),
+    now: input.now,
+    tags: ["engineering", "review"],
+    sourceRefs: [input.intake.id],
+    approved: true
+  });
+  const followUp = await writeMemoryRecord({
+    memoryRoot: input.memoryRoot,
+    type: "engineering",
+    title: `Engineering follow-ups: ${input.intake.projectName}`,
+    body: [
+      `Project: ${input.intake.projectName}`,
+      `Task: ${input.intake.id}`,
+      `Decisions: ${decisions}`,
+      `Regressions: ${regressions}`,
+      `Follow-up tasks: ${followUpTasks}`
+    ].join("\n\n"),
+    now: input.now,
+    tags: ["engineering", "follow_up"],
+    sourceRefs: [input.intake.id],
+    approved: true
+  });
+  if (project.status !== "written" || decision.status !== "written" || followUp.status !== "written") {
+    throw new Error("engineering_memory_reflection_requires_approval");
+  }
+  return {
+    projectPath: project.path,
+    decisionPath: decision.path,
+    followUpPath: followUp.path
+  };
+}
+
+export function assessEngineeringActionRisk(input: EngineeringActionRiskInput): EngineeringActionRisk {
+  if (input.kind === "broad_file_edit") {
+    return {
+      approvalRequired: true,
+      riskLevel: "critical",
+      reason: `Broad file edit requires approval: ${input.target}`
+    };
+  }
+  if (input.kind === "destructive_command") {
+    return {
+      approvalRequired: true,
+      riskLevel: "critical",
+      reason: `Destructive command requires approval: ${input.target}`
+    };
+  }
+  if (input.kind === "external_mutation") {
+    return {
+      approvalRequired: true,
+      riskLevel: "execute",
+      reason: `External mutation requires approval: ${input.target}`
+    };
+  }
+  return {
+    approvalRequired: false,
+    riskLevel: "write",
+    reason: `Single controlled file edit allowed: ${input.target}`
+  };
+}
+
+export function createEngineeringRiskReview(input: EngineeringActionRiskInput): EngineeringRiskReview {
+  return {
+    ...input,
+    ...assessEngineeringActionRisk(input)
+  };
+}
 
 export function createProjectIntake(input: ProjectIntakeInput): ProjectIntake {
   const idea = input.idea.trim();
@@ -224,6 +528,33 @@ export function createTestExecutionRecord(input: TestExecutionRecordInput): Test
     durationMs,
     outputSummary: sanitizeExecutionOutput(input.output)
   };
+}
+
+export function createFailedVerificationSummary(execution: TestExecutionRecord): FailedVerificationSummary | undefined {
+  if (execution.status !== "failed") {
+    return undefined;
+  }
+  return {
+    command: execution.command,
+    summary: `${execution.command} failed with exit code ${execution.exitCode}.`,
+    likelyNextAction: likelyNextActionForFailedVerification(execution),
+    outputSummary: execution.outputSummary
+  };
+}
+
+function likelyNextActionForFailedVerification(execution: TestExecutionRecord): string {
+  const command = execution.command;
+  const output = execution.outputSummary.toLowerCase();
+  if (command.includes("build") || output.includes("error ts")) {
+    return `Fix the TypeScript/build error, then rerun ${command}.`;
+  }
+  if (command.includes("test") || output.includes("expected") || output.includes("failed")) {
+    return `Inspect the failing test output, fix the behavior or test fixture, then rerun ${command}.`;
+  }
+  if (command.includes("doctor")) {
+    return `Fix the reported local diagnostic issue, then rerun ${command}.`;
+  }
+  return `Inspect the failure output, fix the root cause, then rerun ${command}.`;
 }
 
 export async function executeAllowedCommand(input: ExecuteAllowedCommandInput): Promise<TestExecutionRecord> {
@@ -363,12 +694,61 @@ export async function appendReviewSummaryEvent(
   });
 }
 
+export async function appendCodeReviewReportEvent(
+  eventLogPath: string,
+  intake: ProjectIntake,
+  report: CodeReviewReport
+): Promise<void> {
+  await appendEvent(eventLogPath, {
+    id: `event_${intake.id}_code_review_report`,
+    time: new Date().toISOString(),
+    actor: "dore",
+    event_type: "task_updated",
+    entity_type: "task",
+    entity_id: intake.id,
+    summary: `Engineering code review report recorded: ${report.findings.length} findings`,
+    risk_level: "write",
+    refs: ["engineering_code_review_report"],
+    review_report: report
+  });
+}
+
+export async function appendEngineeringRiskReviewEvent(
+  eventLogPath: string,
+  intake: ProjectIntake,
+  review: EngineeringRiskReview
+): Promise<void> {
+  await appendEvent(eventLogPath, {
+    id: `event_${intake.id}_risk_review`,
+    time: new Date().toISOString(),
+    actor: "dore",
+    event_type: "task_updated",
+    entity_type: "task",
+    entity_id: intake.id,
+    summary: `Engineering risk review recorded: ${review.riskLevel} ${review.kind}`,
+    risk_level: review.riskLevel,
+    refs: ["engineering_risk_review"],
+    risk_review: toEngineeringRiskReviewEvent(review)
+  });
+}
+
+function toEngineeringRiskReviewEvent(review: EngineeringRiskReview): Record<string, string | boolean> {
+  return {
+    kind: review.kind,
+    target: review.target,
+    approval_required: review.approvalRequired,
+    risk_level: review.riskLevel,
+    reason: review.reason
+  };
+}
+
 export async function appendTestExecutionEvent(
   eventLogPath: string,
   intake: ProjectIntake,
   execution: TestExecutionRecord
 ): Promise<void> {
   const passed = execution.status === "passed";
+  const failedVerification = createFailedVerificationSummary(execution);
   await appendEvent(eventLogPath, {
     id: `event_${intake.id}_${slugify(execution.command)}`,
     time: new Date().toISOString(),
@@ -383,8 +763,18 @@ export async function appendTestExecutionEvent(
     status: execution.status,
     exit_code: execution.exitCode,
     duration_ms: execution.durationMs,
-    output_summary: execution.outputSummary
+    output_summary: execution.outputSummary,
+    failed_verification: failedVerification ? toFailedVerificationEvent(failedVerification) : undefined
   });
+}
+
+function toFailedVerificationEvent(summary: FailedVerificationSummary): Record<string, string> {
+  return {
+    command: summary.command,
+    summary: summary.summary,
+    likely_next_action: summary.likelyNextAction,
+    output_summary: summary.outputSummary
+  };
 }
 
 export async function appendFileEditEvent(eventLogPath: string, intake: ProjectIntake, edit: FileEditRecord): Promise<void> {

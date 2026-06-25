@@ -1,23 +1,31 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  assessBrokerConnectorInputPacket,
   appendDryRunJournalEntry,
+  appendPaperJournalEntry,
   createBrokerCapabilityRegistry,
   createDryRunJournalEntry,
+  createPaperJournalEntry,
   createStaticMarketDataAdapter,
+  createStrategySignal,
+  createStrategyTemplates,
   createTradingSignal,
   createTradingStatus,
   createWatchlistStore,
+  evaluateMarketDataSources,
   ensureRealTradingBlocked,
   loadWatchlistStore,
+  loadBrokerConnectorInputPacketFile,
   loadRealTradingGateControls,
   createRealTradingGateStatus,
   runRiskCheck,
   saveRealTradingGateControls,
   saveWatchlistStore,
-  summarizeDryRunJournal
+  summarizeDryRunJournal,
+  summarizeTradingJournal
 } from "./index.js";
 
 describe("trading watch and dry-run foundations", () => {
@@ -431,5 +439,333 @@ describe("trading watch and dry-run foundations", () => {
       updated_at: "2026-06-22T09:00:00.000Z",
       updated_by: "user"
     });
+  });
+
+  it("evaluates market data source freshness for Korea and US watchlists", () => {
+    const status = evaluateMarketDataSources({
+      now: "2026-06-22T09:10:00.000Z",
+      maxAgeMs: 5 * 60 * 1000,
+      watchlist: createWatchlistStore([
+        { market: "korea", symbol: "005930" },
+        { market: "us", symbol: "AAPL" }
+      ]),
+      quotes: [
+        {
+          market: "korea",
+          symbol: "005930",
+          price: 70000,
+          currency: "KRW",
+          timestamp: "2026-06-22T09:09:00.000Z",
+          source_refs: ["manual"]
+        }
+      ]
+    });
+
+    expect(status).toEqual([
+      {
+        market: "korea",
+        status: "ok",
+        checked_symbols: 1,
+        blocked_reasons: [],
+        latest_timestamp: "2026-06-22T09:09:00.000Z"
+      },
+      {
+        market: "us",
+        status: "missing",
+        checked_symbols: 1,
+        blocked_reasons: ["Missing market data for AAPL."],
+        latest_timestamp: undefined
+      }
+    ]);
+  });
+
+  it("defines strategy templates with review cadence", () => {
+    expect(createStrategyTemplates().map((template) => template.id)).toEqual([
+      "momentum_watch",
+      "mean_reversion_watch",
+      "portfolio_rebalance",
+      "event_watch",
+      "long_term_thesis"
+    ]);
+    expect(createStrategyTemplates()[0]).toMatchObject({
+      review_cadence: "daily"
+    });
+  });
+
+  it("creates deterministic strategy signals from fresh market data", () => {
+    const signal = createStrategySignal({
+      templateId: "momentum_watch",
+      now: "2026-06-22T09:10:00.000Z",
+      quote: {
+        market: "us",
+        symbol: "AAPL",
+        price: 100,
+        currency: "USD",
+        timestamp: "2026-06-22T09:09:00.000Z",
+        source_refs: ["manual"]
+      },
+      executionMode: "paper",
+      marketOpen: true,
+      policy: {
+        maxOrderKrwEquivalent: 1_000_000,
+        maxDailyNewBuyKrwEquivalent: 3_000_000,
+        maxDataAgeMs: 5 * 60 * 1000,
+        killSwitchEnabled: false
+      }
+    });
+
+    expect(signal).toMatchObject({
+      signal_id: "signal_20260622_AAPL_momentum_watch",
+      strategy_id: "momentum_watch",
+      execution_mode: "paper",
+      risk_check: {
+        status: "pass"
+      }
+    });
+  });
+
+  it("blocks strategy signals when market data is missing, stale, or conflicting", () => {
+    const statuses = evaluateMarketDataSources({
+      now: "2026-06-22T09:10:00.000Z",
+      maxAgeMs: 5 * 60 * 1000,
+      watchlist: createWatchlistStore([{ market: "us", symbol: "AAPL" }]),
+      quotes: [
+        {
+          market: "us",
+          symbol: "AAPL",
+          price: 100,
+          currency: "USD",
+          timestamp: "2026-06-22T08:00:00.000Z",
+          source_refs: ["manual"],
+          conflict: "manual quote differs from broker quote"
+        }
+      ]
+    });
+
+    expect(statuses.find((status) => status.market === "us")).toMatchObject({
+      status: "conflicting",
+      blocked_reasons: expect.arrayContaining(["Conflicting market data for AAPL.", "Stale market data for AAPL."])
+    });
+  });
+
+  it("records paper-mode orders without broker submission", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-trading-"));
+    const signal = createStrategySignal({
+      templateId: "momentum_watch",
+      now: "2026-06-22T09:10:00.000Z",
+      quote: {
+        market: "us",
+        symbol: "AAPL",
+        price: 100,
+        currency: "USD",
+        timestamp: "2026-06-22T09:09:00.000Z",
+        source_refs: ["manual"]
+      },
+      executionMode: "paper",
+      marketOpen: true,
+      policy: {
+        maxOrderKrwEquivalent: 1_000_000,
+        maxDailyNewBuyKrwEquivalent: 3_000_000,
+        maxDataAgeMs: 5 * 60 * 1000,
+        killSwitchEnabled: false
+      }
+    });
+
+    const result = await appendPaperJournalEntry(
+      memoryRoot,
+      createPaperJournalEntry({
+        signal,
+        createdAt: "2026-06-22T09:11:00.000Z",
+        simulatedOrder: {
+          side: "buy",
+          quantity: 1,
+          estimatedPrice: 100,
+          currency: "USD"
+        },
+        postReview: "Paper fill tracked locally."
+      })
+    );
+
+    expect(result.entry).toMatchObject({
+      execution_mode: "paper",
+      broker_order_submitted: false,
+      post_review: "Paper fill tracked locally."
+    });
+    await expect(summarizeTradingJournal(memoryRoot, "2026-06")).resolves.toMatchObject({
+      month: "2026-06",
+      dry_run_entries: 0,
+      paper_entries: 1,
+      latest_signal_id: "signal_20260622_AAPL_momentum_watch"
+    });
+  });
+
+  it("exposes market data and paper journal summaries through trading status", () => {
+    const status = createTradingStatus({
+      realTradingEnabled: false,
+      marketDataSources: [
+        {
+          market: "us",
+          status: "ok",
+          checked_symbols: 1,
+          blocked_reasons: [],
+          latest_timestamp: "2026-06-22T09:09:00.000Z"
+        }
+      ],
+      paperJournal: {
+        month: "2026-06",
+        dry_run_entries: 0,
+        paper_entries: 1,
+        latest_signal_id: "signal_20260622_AAPL_momentum_watch"
+      }
+    });
+
+    expect(status.market_data_sources).toContainEqual(expect.objectContaining({ market: "us", status: "ok" }));
+    expect(status.paper_journal).toMatchObject({ paper_entries: 1 });
+  });
+
+  it("keeps M16 broker connector planning blocked when official inputs are missing", () => {
+    const readiness = assessBrokerConnectorInputPacket({
+      brokerName: "",
+      targetMarkets: [],
+      officialDocumentationRefs: [],
+      officialTermsRefs: [],
+      authenticationVerified: false,
+      termsAndAccountConstraintsVerified: false,
+      credentialRefs: {},
+      paperOrSandboxVerified: false,
+      pilotRiskLimits: {},
+      approvalPolicy: {},
+      explicitUserApprovalToStartM16: false
+    });
+
+    expect(readiness.status).toBe("blocked");
+    expect(readiness.can_start_m16).toBe(false);
+    expect(readiness.blocked_reasons).toEqual([
+      "Broker/API target is missing.",
+      "Target market is missing.",
+      "Official broker/API documentation is missing.",
+      "Official API terms or account constraints are missing.",
+      "API authentication requirements are not verified.",
+      "Terms and account constraints are not verified.",
+      "Broker credential secret references are missing.",
+      "Paper/sandbox availability is not verified or explicitly unavailable.",
+      "Pilot risk limits are incomplete.",
+      "Approval policy is incomplete.",
+      "User has not explicitly approved starting M16 connector planning."
+    ]);
+  });
+
+  it("marks M16 broker connector planning ready only with official refs and secret refs", () => {
+    const readiness = assessBrokerConnectorInputPacket({
+      brokerName: "Toss Securities",
+      targetMarkets: ["korea", "us"],
+      officialDocumentationRefs: ["docs/broker/toss-api.md"],
+      officialTermsRefs: ["docs/broker/toss-terms.md"],
+      authenticationVerified: true,
+      termsAndAccountConstraintsVerified: true,
+      credentialRefs: {
+        toss: {
+          app_key_secret_ref: "secret_ref:brokers/toss/app_key",
+          app_secret_secret_ref: "secret_ref:brokers/toss/app_secret",
+          account_secret_ref: "secret_ref:brokers/toss/account"
+        }
+      },
+      paperOrSandboxVerified: true,
+      pilotRiskLimits: {
+        max_order_krw_equivalent: 100_000,
+        max_daily_new_buy_krw_equivalent: 300_000,
+        max_daily_loss_krw_equivalent: 100_000,
+        max_position_pct: 10
+      },
+      approvalPolicy: {
+        approvalChannel: "desktop",
+        killSwitchOwner: "user"
+      },
+      explicitUserApprovalToStartM16: true
+    });
+
+    expect(readiness.status).toBe("ready");
+    expect(readiness.can_start_m16).toBe(true);
+    expect(readiness.blocked_reasons).toEqual([]);
+    expect(readiness.checks.every((check) => check.status === "pass")).toBe(true);
+  });
+
+  it("rejects raw credential values in M16 broker connector input", () => {
+    const readiness = assessBrokerConnectorInputPacket({
+      brokerName: "Toss Securities",
+      targetMarkets: ["korea"],
+      officialDocumentationRefs: ["docs/broker/toss-api.md"],
+      officialTermsRefs: ["docs/broker/toss-terms.md"],
+      authenticationVerified: true,
+      termsAndAccountConstraintsVerified: true,
+      credentialRefs: {
+        toss: {
+          app_key_secret_ref: "plain-app-key",
+          app_secret_secret_ref: "secret_ref:brokers/toss/app_secret",
+          account_secret_ref: "secret_ref:brokers/toss/account"
+        }
+      },
+      paperOrSandboxVerified: true,
+      pilotRiskLimits: {
+        max_order_krw_equivalent: 100_000,
+        max_daily_new_buy_krw_equivalent: 300_000,
+        max_daily_loss_krw_equivalent: 100_000,
+        max_position_pct: 10
+      },
+      approvalPolicy: {
+        approvalChannel: "desktop",
+        killSwitchOwner: "user"
+      },
+      explicitUserApprovalToStartM16: true
+    });
+
+    expect(readiness.status).toBe("blocked");
+    expect(readiness.blocked_reasons).toContain("Broker credential references must use secret_ref: values only.");
+  });
+
+  it("loads an M16 broker connector input packet from JSON", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-trading-"));
+    const path = join(memoryRoot, "m16-input.json");
+    await writeFile(
+      path,
+      `${JSON.stringify(
+        {
+          brokerName: "Toss Securities",
+          targetMarkets: ["korea"],
+          officialDocumentationRefs: ["docs/broker/toss-api.md"],
+          officialTermsRefs: ["docs/broker/toss-terms.md"],
+          authenticationVerified: true,
+          termsAndAccountConstraintsVerified: true,
+          credentialRefs: {
+            toss: {
+              app_key_secret_ref: "secret_ref:brokers/toss/app_key",
+              app_secret_secret_ref: "secret_ref:brokers/toss/app_secret",
+              account_secret_ref: "secret_ref:brokers/toss/account"
+            }
+          },
+          paperOrSandboxVerified: true,
+          pilotRiskLimits: {
+            max_order_krw_equivalent: 100_000,
+            max_daily_new_buy_krw_equivalent: 300_000,
+            max_daily_loss_krw_equivalent: 100_000,
+            max_position_pct: 10
+          },
+          approvalPolicy: {
+            approvalChannel: "desktop",
+            killSwitchOwner: "user"
+          },
+          explicitUserApprovalToStartM16: true
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const packet = await loadBrokerConnectorInputPacketFile(path);
+    const readiness = assessBrokerConnectorInputPacket(packet);
+
+    expect(packet.brokerName).toBe("Toss Securities");
+    expect(readiness.status).toBe("ready");
   });
 });

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,9 +10,82 @@ import {
   createWatchlistStore,
   saveWatchlistStore
 } from "../../../packages/trading/src/index.js";
+import { runDoctor } from "./doctor.js";
 import { createDaemonApp } from "./server.js";
 
 describe("daemon status", () => {
+  it("returns structured health diagnostics for degraded local setup", async () => {
+    const app = createDaemonApp({
+      projectRoot: "/tmp/dore-missing-project-root",
+      env: {}
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/health"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "failed",
+      summary: {
+        ok: 1,
+        warning: 4,
+        failed: 1
+      }
+    });
+    expect(response.json().checks).toContainEqual(
+      expect.objectContaining({
+        id: "config.example",
+        status: "failed",
+        severity: "required"
+      })
+    );
+    expect(response.json().checks).toContainEqual(
+      expect.objectContaining({
+        id: "openai.credentials",
+        status: "warning",
+        severity: "optional"
+      })
+    );
+    expect(JSON.stringify(response.json())).not.toContain("secret_ref:");
+  });
+
+  it("includes health summary in daemon status", async () => {
+    const app = createDaemonApp({
+      env: {}
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().health).toMatchObject({
+      status: "degraded",
+      summary: {
+        failed: 0,
+        warning: 4
+      }
+    });
+  });
+
+  it("runs doctor from the same structured health report", async () => {
+    const lines: string[] = [];
+    const result = await runDoctor({
+      projectRoot: "/tmp/dore-missing-project-root",
+      env: {},
+      stdout: (line) => lines.push(line)
+    });
+
+    expect(result.report.status).toBe("failed");
+    expect(result.exitCode).toBe(1);
+    expect(lines).toContain("config.example: failed (configs/dore.config.example.yaml)");
+    expect(lines).toContain("openai.credentials: warning (OPENAI_API_KEY env)");
+    expect(lines).toContain("trading.safety: ok (real trading disabled by default)");
+  });
+
   it("returns local runtime status without requiring credentials", async () => {
     const app = createDaemonApp({
       startedAt: new Date("2026-06-21T00:00:00.000Z"),
@@ -38,6 +111,8 @@ describe("daemon status", () => {
       })
     );
     expect(body.providers.openai.configured).toBe(false);
+    expect(body.providers.openai.auth_mode).toBe("api_key");
+    expect(body.providers.openai.reason).toBe("missing_credentials");
     expect(body.telegram.adapter.state).toBe("disabled");
     expect(body.telegram.adapter.reason).toBe("missing_token");
     expect(body.scheduler.jobs).toContainEqual(
@@ -47,6 +122,85 @@ describe("daemon status", () => {
         timezone: "Asia/Seoul"
       })
     );
+  });
+
+  it("reports scheduler retry status from recent failed runs", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-scheduler-"));
+    await mkdir(join(memoryRoot, "logs", "events"), { recursive: true });
+    await writeFile(
+      join(memoryRoot, "logs", "events", "briefing.jsonl"),
+      [
+        JSON.stringify({
+          id: "event_failed_final",
+          time: "2026-06-22T22:00:00+09:00",
+          event_type: "briefing_failed_final",
+          entity_id: "daily_briefing_0600_kst",
+          summary: "Daily briefing failed after retries."
+        }),
+        JSON.stringify({
+          id: "event_failed_attempt",
+          time: "2026-06-22T21:55:00+09:00",
+          event_type: "briefing_failed_attempt",
+          entity_id: "daily_briefing_0600_kst",
+          summary: "Daily briefing retry failed."
+        }),
+        JSON.stringify({
+          id: "event_generated_previous",
+          time: "2026-06-21T06:00:00+09:00",
+          event_type: "briefing_generated",
+          entity_id: "daily_briefing_0600_kst",
+          summary: "Daily briefing generated."
+        })
+      ].join("\n")
+    );
+    const app = createDaemonApp({ memoryRoot });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().scheduler.jobs).toContainEqual(
+      expect.objectContaining({
+        id: "daily_briefing_0600_kst",
+        last_run_status: "failed",
+        failure_count: 2,
+        retry_status: "retry_pending",
+        next_run_at: "2026-06-23T06:00:00+09:00"
+      })
+    );
+  });
+
+  it("marks Telegram ready when token and allowlist are configured", async () => {
+    const app = createDaemonApp({
+      telegramConfig: {
+        enabled: true,
+        mode: "long_polling",
+        bot_token_env: "TEST_TELEGRAM_BOT_TOKEN",
+        allowed_user_ids: [123]
+      },
+      env: {
+        TEST_TELEGRAM_BOT_TOKEN: "secret_ref:telegram-bot-token"
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().telegram).toMatchObject({
+      configured: true,
+      allowlist_required: true,
+      allowlist_count: 1,
+      adapter: {
+        state: "ready",
+        mode: "long_polling"
+      }
+    });
+    expect(JSON.stringify(response.json())).not.toContain("secret_ref:telegram-bot-token");
   });
 
   it("returns trading status without enabling real trading", async () => {
@@ -122,6 +276,18 @@ describe("daemon status", () => {
       blocked: 0,
       latest_signal_id: "signal_20260622_AAPL_status"
     });
+    expect(response.json().paper_journal).toMatchObject({
+      month: "2026-06",
+      dry_run_entries: 1,
+      paper_entries: 0,
+      latest_signal_id: "signal_20260622_AAPL_status"
+    });
+    expect(response.json().market_data_sources).toContainEqual(
+      expect.objectContaining({
+        market: "korea",
+        status: "ok"
+      })
+    );
   });
 
   it("includes persisted watchlist items in trading status", async () => {

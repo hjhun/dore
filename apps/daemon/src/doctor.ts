@@ -1,42 +1,37 @@
-import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { evaluateDaemonHealth, formatHealthReport, type HealthReport } from "./health.js";
 
-const checks = [
-  {
-    name: "config",
-    ok: existsSync("configs/dore.config.example.yaml"),
-    detail: "example config"
-  },
-  {
-    name: "openai",
-    ok: Boolean(process.env.OPENAI_API_KEY),
-    detail: "OPENAI_API_KEY env"
-  },
-  {
-    name: "claude",
-    ok: Boolean(process.env.ANTHROPIC_API_KEY),
-    detail: "ANTHROPIC_API_KEY env"
-  },
-  {
-    name: "gemini",
-    ok: Boolean(process.env.GEMINI_API_KEY),
-    detail: "GEMINI_API_KEY env"
-  },
-  {
-    name: "telegram",
-    ok: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-    detail: "TELEGRAM_BOT_TOKEN env"
-  },
-  {
-    name: "trading",
-    ok: true,
-    detail: "real trading disabled by default"
-  }
-];
-
-for (const check of checks) {
-  const status = check.ok ? "ok" : "missing";
-  console.log(`${check.name}: ${status} (${check.detail})`);
+export interface RunDoctorInput {
+  projectRoot?: string;
+  env?: Record<string, string | undefined>;
+  stdout?: (line: string) => void;
 }
 
-process.exitCode = 0;
+export interface RunDoctorResult {
+  report: HealthReport;
+  exitCode: number;
+}
 
+export async function runDoctor(input: RunDoctorInput = {}): Promise<RunDoctorResult> {
+  const env = input.env ?? process.env;
+  const report = evaluateDaemonHealth({
+    projectRoot: resolve(input.projectRoot ?? env.DORE_PROJECT_ROOT ?? "."),
+    env
+  });
+  const write = input.stdout ?? console.log;
+  for (const line of formatHealthReport(report)) {
+    write(line);
+  }
+  return {
+    report,
+    exitCode: report.status === "failed" ? 1 : 0
+  };
+}
+
+const isDirectRun = process.argv[1] ? fileURLToPath(import.meta.url) === resolve(process.argv[1]) : false;
+
+if (isDirectRun) {
+  const result = await runDoctor();
+  process.exitCode = result.exitCode;
+}

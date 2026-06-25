@@ -4,10 +4,18 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
   applyControlledFileEdit,
+  appendCodeReviewReportEvent,
   appendFileEditEvent,
   appendReviewSummaryEvent,
   appendTestExecutionEvent,
   appendProjectIntakeEvent,
+  assessEngineeringActionRisk,
+  createCodeReviewReport,
+  createDefaultToolRegistry,
+  createDevelopmentWorkflow,
+  createEngineeringRiskReview,
+  createFailedVerificationSummary,
+  reflectEngineeringMemory,
   createProjectIntake,
   createReviewSummary,
   createTestExecutionRecord,
@@ -15,7 +23,8 @@ import {
   executeAllowedCommand,
   inspectRepository,
   persistProjectIntakeDrafts,
-  runEngineeringIntake
+  runEngineeringIntake,
+  summarizeDevelopmentTaskStages
 } from "./index.js";
 
 describe("engineering project intake", () => {
@@ -108,6 +117,23 @@ describe("engineering project intake", () => {
     expect(record.outputSummary).toContain(`${telegramTokenName}=<redacted>`);
     expect(record.outputSummary).not.toContain("abc123");
     expect(record.outputSummary).not.toContain("telegram-secret");
+  });
+
+  it("summarizes failed verification with a likely next action", () => {
+    const record = createTestExecutionRecord({
+      command: "pnpm build",
+      exitCode: 2,
+      startedAt: "2026-06-22T09:00:00.000Z",
+      completedAt: "2026-06-22T09:00:04.000Z",
+      output: "src/app.ts(12,5): error TS2304: Cannot find name 'missingValue'."
+    });
+
+    expect(createFailedVerificationSummary(record)).toEqual({
+      command: "pnpm build",
+      summary: "pnpm build failed with exit code 2.",
+      likelyNextAction: "Fix the TypeScript/build error, then rerun pnpm build.",
+      outputSummary: "src/app.ts(12,5): error TS2304: Cannot find name 'missingValue'."
+    });
   });
 
   it("inspects repository branch and changed files through git", async () => {
@@ -456,5 +482,247 @@ describe("engineering project intake", () => {
     });
     expect(record.edit_summary).toContain(`${["OPENAI", "API", "KEY"].join("_")}=<redacted>`);
     expect(record.edit_summary).not.toContain("abc123");
+  });
+
+  it("defines a default tool registry with approval boundaries", () => {
+    const registry = createDefaultToolRegistry();
+
+    expect(registry.tools.map((tool) => tool.id)).toEqual([
+      "file.read",
+      "file.edit.controlled",
+      "command.verify",
+      "repo.inspect",
+      "documentation.write"
+    ]);
+    expect(registry.tools.find((tool) => tool.id === "file.edit.controlled")).toMatchObject({
+      category: "file",
+      approvalRequiredFor: ["broad_file_edit", "secret_write"]
+    });
+  });
+
+  it("creates a task-logged development workflow from intake through memory reflection", () => {
+    const intake = createProjectIntake({
+      idea: "Add workflow productization",
+      requestedBy: "hjhun",
+      now: "2026-06-22T08:00:00.000Z"
+    });
+    const workflow = createDevelopmentWorkflow({
+      intake,
+      runtimeTaskId: "task_dev_workflow",
+      now: "2026-06-22T08:00:00.000Z"
+    });
+
+    expect(workflow.runtimeTaskId).toBe("task_dev_workflow");
+    expect(workflow.steps.map((step) => step.kind)).toEqual([
+      "intake",
+      "plan",
+      "patch",
+      "verify",
+      "review",
+      "summarize",
+      "memory_reflection"
+    ]);
+    expect(workflow.steps.every((step) => step.taskLogEvent)).toBe(true);
+  });
+
+  it("summarizes development workflow stages for task visibility", () => {
+    const intake = createProjectIntake({
+      idea: "Expose workflow stages",
+      requestedBy: "hjhun",
+      now: "2026-06-22T08:00:00.000Z"
+    });
+
+    expect(summarizeDevelopmentTaskStages({ intake, taskStatus: "planned" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "intake", status: "completed" }),
+        expect.objectContaining({ kind: "plan", status: "in_progress" }),
+        expect.objectContaining({ kind: "patch", status: "pending" }),
+        expect.objectContaining({ kind: "verify", status: "pending" }),
+        expect.objectContaining({ kind: "review", status: "pending" }),
+        expect.objectContaining({ kind: "memory_reflection", status: "pending" })
+      ])
+    );
+    expect(summarizeDevelopmentTaskStages({ intake, taskStatus: "completed" }).every((stage) => stage.status === "completed")).toBe(
+      true
+    );
+    expect(summarizeDevelopmentTaskStages({ intake, taskStatus: "failed" })).toContainEqual(
+      expect.objectContaining({ kind: "verify", status: "blocked" })
+    );
+  });
+
+  it("orders code review findings by behavioral severity with file and line references", () => {
+    const report = createCodeReviewReport({
+      findings: [
+        {
+          category: "style",
+          severity: "low",
+          file: "src/view.ts",
+          line: 40,
+          message: "Name can be clearer."
+        },
+        {
+          category: "bug",
+          severity: "high",
+          file: "src/runner.ts",
+          line: 12,
+          message: "Cancellation result is ignored."
+        },
+        {
+          category: "missing_test",
+          severity: "medium",
+          file: "src/runner.test.ts",
+          line: 1,
+          message: "No regression test for failed command."
+        }
+      ]
+    });
+
+    expect(report.findings.map((finding) => finding.category)).toEqual(["bug", "missing_test", "style"]);
+    expect(report.findings[0].reference).toBe("src/runner.ts:12");
+  });
+
+  it("logs code review reports with severity-ordered findings", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-review-report-"));
+    const eventLogPath = join(memoryRoot, "logs", "events", "engineering.jsonl");
+    const intake = createProjectIntake({
+      idea: "Persist code review report",
+      requestedBy: "hjhun",
+      now: "2026-06-22T10:00:00.000Z"
+    });
+    const report = createCodeReviewReport({
+      findings: [
+        {
+          category: "style",
+          severity: "low",
+          file: "src/view.ts",
+          line: 40,
+          message: "Name can be clearer."
+        },
+        {
+          category: "bug",
+          severity: "high",
+          file: "src/runner.ts",
+          line: 12,
+          message: "Cancellation result is ignored."
+        }
+      ]
+    });
+
+    await appendCodeReviewReportEvent(eventLogPath, intake, report);
+    const log = await readFile(eventLogPath, "utf8");
+
+    expect(log).toContain("Engineering code review report recorded: 2 findings");
+    expect(log.indexOf("src/runner.ts:12")).toBeLessThan(log.indexOf("src/view.ts:40"));
+  });
+
+  it("reflects engineering outcomes into project memory and decision records", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-memory-"));
+    const intake = createProjectIntake({
+      idea: "Reflect engineering memory",
+      requestedBy: "hjhun",
+      now: "2026-06-22T08:00:00.000Z"
+    });
+    const review = createReviewSummary({
+      intake,
+      repo: {
+        branch: "feature/m13",
+        dirty: false,
+        changedFiles: []
+      },
+      executions: [
+        createTestExecutionRecord({
+          command: "pnpm test",
+          exitCode: 0,
+          startedAt: "2026-06-22T08:00:00.000Z",
+          completedAt: "2026-06-22T08:00:01.000Z",
+          output: "ok"
+        })
+      ]
+    });
+
+    const reflection = await reflectEngineeringMemory({
+      memoryRoot,
+      intake,
+      review,
+      now: "2026-06-22T08:05:00.000Z"
+    });
+
+    expect(await readFile(reflection.projectPath, "utf8")).toContain("Reflect engineering memory");
+    expect(await readFile(reflection.decisionPath, "utf8")).toContain("Engineering review summary: ready_for_review");
+  });
+
+  it("reflects decisions, regressions, and follow-up tasks into engineering memory", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-memory-"));
+    const intake = createProjectIntake({
+      idea: "Reflect engineering regressions",
+      requestedBy: "hjhun",
+      now: "2026-06-22T08:00:00.000Z"
+    });
+    const review = createReviewSummary({
+      intake,
+      repo: {
+        branch: "feature/m21",
+        dirty: true,
+        changedFiles: ["packages/engineering/src/index.ts"]
+      },
+      executions: [
+        createTestExecutionRecord({
+          command: "pnpm test",
+          exitCode: 1,
+          startedAt: "2026-06-22T08:00:00.000Z",
+          completedAt: "2026-06-22T08:00:01.000Z",
+          output: "failed"
+        })
+      ]
+    });
+
+    const reflection = await reflectEngineeringMemory({
+      memoryRoot,
+      intake,
+      review,
+      now: "2026-06-22T08:05:00.000Z"
+    });
+
+    const decisionText = await readFile(reflection.decisionPath, "utf8");
+    expect(decisionText).toContain("Decisions:");
+    expect(decisionText).toContain("Regressions: pnpm test");
+    expect(decisionText).toContain("Follow-up tasks: Working tree still has 1 changed file.");
+
+    const followUpText = await readFile(reflection.followUpPath, "utf8");
+    expect(followUpText).toContain("Decisions:");
+    expect(followUpText).toContain("Regressions: pnpm test");
+    expect(followUpText).toContain("Follow-up tasks: Working tree still has 1 changed file.");
+  });
+
+  it("requires approval for broad or destructive engineering actions", () => {
+    expect(assessEngineeringActionRisk({ kind: "broad_file_edit", target: "packages" })).toMatchObject({
+      approvalRequired: true,
+      riskLevel: "critical"
+    });
+    expect(assessEngineeringActionRisk({ kind: "destructive_command", target: "rm -rf memory" })).toMatchObject({
+      approvalRequired: true,
+      riskLevel: "critical"
+    });
+    expect(assessEngineeringActionRisk({ kind: "single_file_edit", target: "README.md" })).toMatchObject({
+      approvalRequired: false,
+      riskLevel: "write"
+    });
+  });
+
+  it("creates workflow risk reviews with requested action context", () => {
+    expect(createEngineeringRiskReview({ kind: "broad_file_edit", target: "packages" })).toEqual({
+      kind: "broad_file_edit",
+      target: "packages",
+      approvalRequired: true,
+      riskLevel: "critical",
+      reason: "Broad file edit requires approval: packages"
+    });
+    expect(createEngineeringRiskReview({ kind: "single_file_edit", target: "README.md" })).toEqual({
+      kind: "single_file_edit",
+      target: "README.md",
+      approvalRequired: false,
+      riskLevel: "write",
+      reason: "Single controlled file edit allowed: README.md"
+    });
   });
 });

@@ -1,0 +1,92 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+export type HealthStatus = "ok" | "degraded" | "failed";
+export type HealthCheckStatus = "ok" | "warning" | "failed";
+export type HealthCheckSeverity = "required" | "optional";
+
+export interface HealthCheck {
+  id: string;
+  label: string;
+  status: HealthCheckStatus;
+  severity: HealthCheckSeverity;
+  detail: string;
+}
+
+export interface HealthReport {
+  status: HealthStatus;
+  summary: {
+    ok: number;
+    warning: number;
+    failed: number;
+  };
+  checks: HealthCheck[];
+}
+
+export interface EvaluateDaemonHealthInput {
+  projectRoot: string;
+  env: Record<string, string | undefined>;
+}
+
+export function evaluateDaemonHealth(input: EvaluateDaemonHealthInput): HealthReport {
+  const checks: HealthCheck[] = [
+    requiredFileCheck({
+      id: "config.example",
+      label: "Example config",
+      path: "configs/dore.config.example.yaml",
+      projectRoot: input.projectRoot
+    }),
+    optionalEnvCheck("openai.credentials", "OpenAI credentials", "OPENAI_API_KEY", input.env),
+    optionalEnvCheck("claude.credentials", "Claude credentials", "ANTHROPIC_API_KEY", input.env),
+    optionalEnvCheck("gemini.credentials", "Gemini credentials", "GEMINI_API_KEY", input.env),
+    optionalEnvCheck("telegram.credentials", "Telegram bot token", "TELEGRAM_BOT_TOKEN", input.env),
+    {
+      id: "trading.safety",
+      label: "Trading safety",
+      status: "ok",
+      severity: "required",
+      detail: "real trading disabled by default"
+    }
+  ];
+
+  const summary = {
+    ok: checks.filter((check) => check.status === "ok").length,
+    warning: checks.filter((check) => check.status === "warning").length,
+    failed: checks.filter((check) => check.status === "failed").length
+  };
+
+  return {
+    status: summary.failed > 0 ? "failed" : summary.warning > 0 ? "degraded" : "ok",
+    summary,
+    checks
+  };
+}
+
+export function formatHealthReport(report: HealthReport): string[] {
+  return report.checks.map((check) => `${check.id}: ${check.status} (${check.detail})`);
+}
+
+function requiredFileCheck(input: { id: string; label: string; path: string; projectRoot: string }): HealthCheck {
+  return {
+    id: input.id,
+    label: input.label,
+    status: existsSync(join(input.projectRoot, input.path)) ? "ok" : "failed",
+    severity: "required",
+    detail: input.path
+  };
+}
+
+function optionalEnvCheck(
+  id: string,
+  label: string,
+  envName: string,
+  env: Record<string, string | undefined>
+): HealthCheck {
+  return {
+    id,
+    label,
+    status: env[envName] ? "ok" : "warning",
+    severity: "optional",
+    detail: `${envName} env`
+  };
+}

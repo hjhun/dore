@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -43,6 +43,7 @@ export interface GenerateDailyBriefingInput {
   generatedAt: string;
   llmAvailable: boolean;
   sources: BriefingSources;
+  failedJobs?: string[];
 }
 
 export interface ManualBriefingInput {
@@ -51,20 +52,51 @@ export interface ManualBriefingInput {
   date?: string;
   timezone?: string;
   generatedAt?: string;
-  env?: NodeJS.ProcessEnv;
+  env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
 }
+
+export interface BriefingDelivery {
+  telegram_summary: string;
+  dashboard_json_path: string;
+  markdown_path: string;
+}
+
+export type DailyBriefingRecord = Omit<ReturnType<typeof generateDailyBriefing>, "status"> & {
+  status: "generated" | "partial" | "failed";
+  attempts?: BriefingAttempt[];
+};
 
 export interface ManualBriefingResult {
   markdownPath: string;
   jsonPath: string;
   usagePath: string;
+  briefing: DailyBriefingRecord & { delivery: BriefingDelivery };
+  delivery: BriefingDelivery;
+}
+
+export interface BriefingAttempt {
+  attempt: number;
+  scheduled_time: string;
+  status: "failed" | "generated";
+  error_code?: string;
+}
+
+export interface BriefingJobInput extends ManualBriefingInput {
+  trigger: "manual" | "scheduled";
+  retrySchedule?: string[];
+  collectSources?: (input: { projectRoot: string; memoryRoot: string }) => Promise<BriefingSources>;
+}
+
+export interface BriefingJobResult extends ManualBriefingResult {
+  status: "generated" | "partial" | "failed";
+  attempts: BriefingAttempt[];
+  eventLogPath: string;
 }
 
 export function generateDailyBriefing(input: GenerateDailyBriefingInput) {
-  const status = input.llmAvailable ? "generated" : "partial";
+  const status: "generated" | "partial" = input.llmAvailable ? "generated" : "partial";
   const taskItems = input.sources.tasks.length > 0 ? input.sources.tasks : ["No personal tasks configured yet."];
-  const approvalItems =
-    input.sources.approvals.length > 0 ? input.sources.approvals : ["No pending approvals."];
+  const approvalItems = input.sources.approvals.length > 0 ? input.sources.approvals : ["No pending approvals."];
   const blockedActions = input.sources.trading.realTradingEnabled ? [] : ["Real trading disabled."];
 
   return {
@@ -99,7 +131,7 @@ export function generateDailyBriefing(input: GenerateDailyBriefingInput) {
       },
       agent_ops: {
         pending_approvals: approvalItems,
-        failed_jobs: [],
+        failed_jobs: input.failedJobs ?? [],
         usage_summary: {
           calls_today: input.sources.usage.callsToday,
           estimated_cost_usd_month: input.sources.usage.estimatedCostUsdMonth
@@ -107,6 +139,7 @@ export function generateDailyBriefing(input: GenerateDailyBriefingInput) {
       }
     },
     source_refs: ["local_repo", "local_memory", "market_placeholders"],
+    source_freshness: createSourceFreshness(input.sources),
     usage: {
       provider: "deterministic",
       model: "fallback",
@@ -118,33 +151,133 @@ export function generateDailyBriefing(input: GenerateDailyBriefingInput) {
 }
 
 export async function runManualBriefing(input: ManualBriefingInput): Promise<ManualBriefingResult> {
+  return runBriefingJob({
+    ...input,
+    trigger: "manual",
+    retrySchedule: ["manual"]
+  });
+}
+
+export async function runBriefingJob(input: BriefingJobInput): Promise<BriefingJobResult> {
   const timezone = input.timezone ?? "Asia/Seoul";
   const generatedAt = input.generatedAt ?? new Date().toISOString();
-  const date = input.date ?? formatDateForTimezone(new Date(), timezone);
-  const sources = await collectBriefingSources(input.projectRoot, input.memoryRoot);
+  const date = input.date ?? formatDateForTimezone(new Date(generatedAt), timezone);
+  const retrySchedule = input.retrySchedule ?? (input.trigger === "scheduled" ? ["06:00", "06:10", "06:30"] : ["manual"]);
+  const collect = input.collectSources ?? ((context: { projectRoot: string; memoryRoot: string }) => collectBriefingSources(context.projectRoot, context.memoryRoot));
   const llmAvailable = Boolean(input.env?.OPENAI_API_KEY || input.env?.ANTHROPIC_API_KEY || input.env?.GEMINI_API_KEY);
-  const briefing = generateDailyBriefing({
+  const attempts: BriefingAttempt[] = [];
+  const eventLogPath = join(input.memoryRoot, "logs", "events", "briefing.jsonl");
+
+  for (let index = 0; index < retrySchedule.length; index += 1) {
+    const scheduledTime = retrySchedule[index] ?? "manual";
+    try {
+      const sources = await collect({
+        projectRoot: input.projectRoot,
+        memoryRoot: input.memoryRoot
+      });
+      attempts.push({
+        attempt: index + 1,
+        scheduled_time: scheduledTime,
+        status: "generated"
+      });
+      const briefing = generateDailyBriefing({
+        date,
+        timezone,
+        generatedAt,
+        llmAvailable,
+        sources
+      });
+      const written = await writeBriefingRecord(input.memoryRoot, briefing);
+      await appendBriefingEvent(eventLogPath, {
+        id: createBriefingEventId(generatedAt, "generated", index + 1),
+        time: generatedAt,
+        event_type: "briefing_generated",
+        summary: `Daily briefing generated on attempt ${index + 1}.`,
+        status: briefing.status,
+        attempt: index + 1,
+        scheduled_time: scheduledTime,
+        refs: [written.markdownPath, written.jsonPath, written.usagePath]
+      });
+
+      return {
+        ...written,
+        status: briefing.status,
+        attempts,
+        eventLogPath
+      };
+    } catch {
+      attempts.push({
+        attempt: index + 1,
+        scheduled_time: scheduledTime,
+        status: "failed",
+        error_code: "source_collection_failed"
+      });
+      await appendBriefingEvent(eventLogPath, {
+        id: createBriefingEventId(generatedAt, "failed_attempt", index + 1),
+        time: generatedAt,
+        event_type: "briefing_failed_attempt",
+        summary: `Daily briefing attempt ${index + 1} failed.`,
+        status: "failed",
+        attempt: index + 1,
+        scheduled_time: scheduledTime,
+        refs: []
+      });
+    }
+  }
+
+  const briefing = createFailedBriefing({
     date,
     timezone,
     generatedAt,
-    llmAvailable,
-    sources
+    attempts
+  });
+  const written = await writeBriefingRecord(input.memoryRoot, briefing);
+  await appendBriefingEvent(eventLogPath, {
+    id: createBriefingEventId(generatedAt, "failed_final", attempts.length),
+    time: generatedAt,
+    event_type: "briefing_failed_final",
+    summary: "Daily briefing failed after all retry attempts.",
+    status: "failed",
+    attempt: attempts.length,
+    scheduled_time: attempts.at(-1)?.scheduled_time ?? "unknown",
+    refs: [written.markdownPath, written.jsonPath, written.usagePath]
   });
 
-  const dailyDir = join(input.memoryRoot, "logs", "daily");
-  const usageDir = join(input.memoryRoot, "logs", "usage");
+  return {
+    ...written,
+    status: "failed",
+    attempts,
+    eventLogPath
+  };
+}
+
+async function writeBriefingRecord(
+  memoryRoot: string,
+  briefing: DailyBriefingRecord
+): Promise<ManualBriefingResult> {
+  const dailyDir = join(memoryRoot, "logs", "daily");
+  const usageDir = join(memoryRoot, "logs", "usage");
   await mkdir(dailyDir, { recursive: true });
   await mkdir(usageDir, { recursive: true });
 
-  const markdownPath = join(dailyDir, `${date}.md`);
-  const jsonPath = join(dailyDir, `${date}.json`);
-  const usagePath = join(usageDir, `${date.slice(0, 7)}.jsonl`);
+  const markdownPath = join(dailyDir, `${briefing.date}.md`);
+  const jsonPath = join(dailyDir, `${briefing.date}.json`);
+  const usagePath = join(usageDir, `${briefing.date.slice(0, 7)}.jsonl`);
+  const delivery: BriefingDelivery = {
+    telegram_summary: renderTelegramSummary(briefing),
+    dashboard_json_path: jsonPath,
+    markdown_path: markdownPath
+  };
+  const record = {
+    ...briefing,
+    delivery
+  };
 
   await writeFile(markdownPath, renderBriefingMarkdown(briefing), "utf8");
-  await writeFile(jsonPath, `${JSON.stringify(briefing, null, 2)}\n`, "utf8");
+  await writeFile(jsonPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   await writeFile(usagePath, `${JSON.stringify(createUsageRecord(briefing))}\n`, { flag: "a" });
 
-  return { markdownPath, jsonPath, usagePath };
+  return { markdownPath, jsonPath, usagePath, briefing: record, delivery };
 }
 
 async function collectBriefingSources(projectRoot: string, memoryRoot: string): Promise<BriefingSources> {
@@ -213,7 +346,53 @@ async function readLatestDailyLog(memoryRoot: string): Promise<string | null> {
   }
 }
 
-function renderBriefingMarkdown(briefing: ReturnType<typeof generateDailyBriefing>): string {
+function createFailedBriefing(input: { date: string; timezone: string; generatedAt: string; attempts: BriefingAttempt[] }) {
+  const sources: BriefingSources = {
+    repo: {
+      branch: "unknown",
+      dirty: false,
+      summary: "source collection failed"
+    },
+    memory: {
+      rootExists: false,
+      latestDailyLog: null
+    },
+    tasks: [],
+    approvals: [],
+    usage: {
+      estimatedCostUsdMonth: 0,
+      callsToday: 0
+    },
+    markets: {
+      korea: {
+        status: "failed",
+        summary: "Korea market source collection failed."
+      },
+      us: {
+        status: "failed",
+        summary: "US market source collection failed."
+      }
+    },
+    trading: {
+      realTradingEnabled: false,
+      brokerCapabilities: {}
+    }
+  };
+  return {
+    ...generateDailyBriefing({
+      date: input.date,
+      timezone: input.timezone,
+      generatedAt: input.generatedAt,
+      llmAvailable: false,
+      sources,
+      failedJobs: ["daily_briefing"]
+    }),
+    status: "failed" as const,
+    attempts: input.attempts
+  };
+}
+
+function renderBriefingMarkdown(briefing: DailyBriefingRecord): string {
   const sections = briefing.dashboard_sections;
   return [
     `# Daily Briefing - ${briefing.date}`,
@@ -247,7 +426,21 @@ function renderBriefingMarkdown(briefing: ReturnType<typeof generateDailyBriefin
   ].join("\n");
 }
 
-function createUsageRecord(briefing: ReturnType<typeof generateDailyBriefing>) {
+function renderTelegramSummary(briefing: DailyBriefingRecord): string {
+  const sections = briefing.dashboard_sections;
+  return [
+    `Dore Morning Briefing - ${briefing.date}`,
+    "",
+    `1. ${sections.personal.top_items[0] ?? "No personal tasks configured yet."}`,
+    `2. ${sections.engineering.project_status[0] ?? "No engineering status."}`,
+    `3. ${sections.korea_market.summary}`,
+    `4. ${sections.us_market.summary}`,
+    `5. ${sections.agent_ops.pending_approvals[0] ?? "No pending approvals."}`,
+    `6. ${sections.trading.blocked_actions[0] ?? "No trading blocks."}`
+  ].join("\n");
+}
+
+function createUsageRecord(briefing: DailyBriefingRecord) {
   return {
     id: `usage_${briefing.date.replaceAll("-", "_")}_briefing`,
     category: "briefing",
@@ -260,6 +453,63 @@ function createUsageRecord(briefing: ReturnType<typeof generateDailyBriefing>) {
   };
 }
 
+function createSourceFreshness(sources: BriefingSources) {
+  return [
+    {
+      source: "local_repo",
+      status: sources.repo.summary === "source collection failed" ? "failed" : "ok",
+      observed_at: null
+    },
+    {
+      source: "local_memory",
+      status: sources.memory.rootExists ? "ok" : "failed",
+      observed_at: null
+    },
+    {
+      source: "korea_market",
+      status: sources.markets.korea.status,
+      observed_at: null
+    },
+    {
+      source: "us_market",
+      status: sources.markets.us.status,
+      observed_at: null
+    }
+  ];
+}
+
+async function appendBriefingEvent(
+  path: string,
+  event: {
+    id: string;
+    time: string;
+    event_type: "briefing_generated" | "briefing_failed_attempt" | "briefing_failed_final";
+    summary: string;
+    status: string;
+    attempt: number;
+    scheduled_time: string;
+    refs: string[];
+  }
+) {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(
+    path,
+    `${JSON.stringify({
+      actor: "scheduler",
+      entity_type: "briefing",
+      entity_id: "daily_briefing",
+      risk_level: "read",
+      ...event
+    })}\n`,
+    { flag: "a" }
+  );
+}
+
+function createBriefingEventId(now: string, suffix: string, attempt: number): string {
+  const timestamp = now.replace(/\D/g, "").slice(0, 14) || "manual";
+  return `event_${timestamp}_briefing_${suffix}_${attempt}`;
+}
+
 function formatDateForTimezone(date: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -267,7 +517,6 @@ function formatDateForTimezone(date: Date, timezone: string): string {
     month: "2-digit",
     day: "2-digit"
   }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+  const get = (type: string) => parts.find((part) => part.type === "year" || part.type === "month" || part.type === "day") && parts.find((part) => part.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
-

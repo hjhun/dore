@@ -8,8 +8,8 @@ Update it whenever development state changes.
 
 - Branch: `codex/add-agent-development-guide`
 - Active plan: `docs/plan/ROADMAP.md`
-- Active milestone: M6, Pilot Real Trading Preparation
-- Current task: pre-broker objective audited; waiting for broker/API details for connector planning
+- Active milestone: M21, Development Agent Workflow Depth
+- Current task: M21 local development-agent workflow depth is complete; M16/M17 broker work is blocked by missing official inputs
 
 ## Milestone Progress
 
@@ -100,6 +100,82 @@ Update it whenever development state changes.
 - [x] M6 kill-switch control route persists across daemon restarts.
 - [x] M6 acceptance audit documented.
 - [x] Project status audit documented for current pre-broker objective.
+- [x] Draft requirement coverage audited against `docs/plan`.
+- [x] Roadmap expanded from foundation-only M0-M6 to MVP completion M0-M15 and post-MVP broker work M16-M17.
+- [x] M7 ApprovalRequest contract implemented with tests.
+- [x] M7 generic runtime task store and endpoints implemented.
+- [x] M7 approval queue endpoints implemented.
+- [x] M7 latest briefing, briefing run, usage summary, and memory index endpoints implemented.
+- [x] M7 non-local runtime endpoint protection implemented.
+- [x] M7 runtime API status visibility and audit events implemented.
+- [x] M8 LLM usage record contract implemented with tests.
+- [x] M8 provider registry exposes OpenAI, Claude, and Gemini availability without secrets.
+- [x] M8 model gateway provider adapter flow implemented with injected clients.
+- [x] M8 missing credentials return unavailable and write failed usage records.
+- [x] M8 successful provider calls write provider/model/auth/token/cost/latency usage records.
+- [x] M8 monthly soft limit returns warning payload.
+- [x] M8 hard approval threshold blocks new work and writes failed usage records.
+- [x] M8 daemon `/status` provider state exposes auth mode and missing credential reason without secrets.
+- [x] M9 scheduled briefing job execution implemented.
+- [x] M9 briefing retry schedule implemented.
+- [x] M9 briefing failed-attempt and final-failure event logging implemented.
+- [x] M9 shared Telegram summary and dashboard JSON delivery record implemented.
+- [x] M9 daemon `POST /briefings/run` supports scheduled trigger semantics.
+- [x] M9 source freshness metadata implemented.
+- [x] M10 daemon-backed Telegram command context implemented.
+- [x] M10 Telegram HTTP daemon client implemented.
+- [x] M10 `/stop` cancels or requests cancellation through daemon task API.
+- [x] M10 daily briefing Telegram push helper implemented.
+- [x] M10 task completion, task failure, and approval notifications implemented.
+- [x] M10 Telegram failure logging redacts tokens and secret references.
+- [x] M10 daemon `/status` reflects Telegram token/allowlist readiness without secrets.
+- [x] M11 daemon `/logs/recent` implemented for event, usage, and trading logs.
+- [x] M11 desktop dashboard critical strip and product metrics implemented.
+- [x] M11 desktop status aggregation reads daemon status, briefing, usage, memory, and logs.
+- [x] M11 approval queue supports daemon-backed decision client hook.
+- [x] M11 logs can be filtered by action, approval, trading, usage, and error.
+- [x] M11 settings status remains secret-safe.
+- [x] M11 chat and task/schedule MVP surfaces implemented.
+- [x] M12 memory writer supports profile, project, topic, decision, routine, trading, engineering, and daily log records.
+- [x] M12 sensitive memory writes create approval requests before wiki persistence.
+- [x] M12 raw sources remain under `memory/raw` and link to wiki `source_refs`.
+- [x] M12 memory updates supersede previous active records.
+- [x] M12 operational memory files persist active context, tasks, reminders, open questions, and approvals.
+- [x] M12 wiki index/search implemented.
+- [x] M12 stale/conflict metadata implemented.
+- [x] M12 daemon `POST /memory/records` implemented.
+- [x] M13 default engineering tool registry implemented.
+- [x] M13 development workflow steps implemented.
+- [x] M13 code review severity ordering and file/line references implemented.
+- [x] M13 engineering memory reflection implemented.
+- [x] M13 broad/destructive/external action approval assessment implemented.
+- [x] M14 market data source status and freshness checks implemented.
+- [x] M14 strategy templates implemented.
+- [x] M14 deterministic strategy signal creation implemented.
+- [x] M14 paper-mode journal implemented.
+- [x] M14 trading journal summary covers dry-run and paper entries.
+- [x] M14 daemon and desktop trading visibility updated.
+- [x] M15 MVP acceptance audit documented.
+- [x] M15 eval and manual scenario runbook documented.
+- [x] M15 Hermes parity and slash command checklist documented.
+- [x] M15 session lifecycle and recovery plan documented.
+- [x] M15 local onboarding and security audit documented.
+- [x] M15 MVP failure criteria audited false for local non-real-trading MVP.
+- [x] M16 broker/API input packet documented.
+- [x] M16 broker/API input packet readiness evaluator implemented.
+- [x] M16 broker/API input packet CLI validator implemented.
+- [x] Roadmap updated to keep M16/M17 blocked and continue local hardening through M18-M21.
+- [x] M18 desktop operations hardening implemented.
+- [x] M19 structured daemon health and doctor diagnostics implemented.
+- [x] M19 scheduler restart/recovery status implemented.
+- [x] M19 daemon reliability and local persistence hardening implemented.
+- [x] M20 memory quality review primitives implemented.
+- [x] M20 memory maintenance evals and daemon/desktop quality visibility implemented.
+- [x] M21 development task stage visibility implemented.
+- [x] M21 failed verification summary and next-action visibility implemented.
+- [x] M21 code-review report storage and desktop visibility implemented.
+- [x] M21 workflow risk review visibility implemented.
+- [x] M21 engineering memory reflection improvements implemented.
 
 ## M0 Checklist
 
@@ -228,6 +304,185 @@ Update it whenever development state changes.
 - [x] Kill-switch control changes persist across daemon restarts.
 - [x] Missing official broker API details keep all real order paths blocked.
 - [x] M6 acceptance audit proves pre-broker scope acceptance criteria.
+
+## M7 Checklist
+
+- [x] `ApprovalRequestSchema` exists.
+- [x] `GET /tasks` exists.
+- [x] `GET /tasks/:id` exists.
+- [x] `POST /tasks` exists.
+- [x] `POST /tasks/:id/cancel` exists.
+- [x] `GET /approvals` exists.
+- [x] `POST /approvals` exists.
+- [x] `POST /approvals/:id/approve` exists.
+- [x] `POST /approvals/:id/reject` exists.
+- [x] `GET /briefings/latest` exists.
+- [x] `POST /briefings/run` exists.
+- [x] `GET /usage/summary` exists.
+- [x] `GET /memory/index` exists.
+- [x] Runtime endpoints reject unauthenticated non-local requests.
+- [x] Task cancellation is visible in `/status`.
+- [x] Approval decisions update linked task records.
+- [x] Runtime mutations append audit events.
+
+## M8 Checklist
+
+- [x] `LlmUsageRecordSchema` exists.
+- [x] Provider registry supports OpenAI, Claude, and Gemini.
+- [x] Provider registry exposes availability without raw credentials.
+- [x] Gateway can call a configured provider through an adapter interface.
+- [x] Missing credentials are graceful unavailable states.
+- [x] Successful provider calls write usage records.
+- [x] Failed/unavailable provider calls write usage records.
+- [x] Usage records include provider, model, auth mode, token counts, estimated cost, latency, and status.
+- [x] Monthly soft limit warning is represented.
+- [x] Hard approval threshold blocks new work.
+- [x] Daemon `/status` exposes provider auth mode/model/reason fields without secrets.
+
+## M9 Checklist
+
+- [x] Scheduled daily briefing jobs can execute handlers.
+- [x] Scheduled job handler success is reported.
+- [x] Scheduled job handler failure is reported.
+- [x] Manual and scheduled briefing runs produce Markdown and JSON outputs.
+- [x] Briefing retry schedule supports 06:00, 06:10, and 06:30 attempts.
+- [x] Failed briefing attempts are logged.
+- [x] Final briefing failure writes a failed daily record.
+- [x] Telegram summary and dashboard detail are generated from the same briefing record.
+- [x] `GET /briefings/latest` returns the shared briefing record.
+- [x] `POST /briefings/run` can run scheduled trigger semantics.
+- [x] Source freshness metadata is present in the dashboard record.
+- [x] Briefing usage record is written.
+
+## M10 Checklist
+
+- [x] Telegram command context can read daemon `/status`.
+- [x] Telegram `/briefing` can read latest daemon briefing delivery summary.
+- [x] Telegram `/usage` can read daemon usage summary.
+- [x] Telegram `/stop` chooses a running/queued task and calls daemon cancellation.
+- [x] HTTP daemon client covers `/status`, `/briefings/latest`, `/usage/summary`, `/tasks`, and `/tasks/:id/cancel`.
+- [x] Daily briefing summaries can be pushed to all allowlisted users.
+- [x] Task completion notifications can be delivered.
+- [x] Task failure notifications can be delivered.
+- [x] Approval request notifications can be delivered.
+- [x] Telegram delivery failures are logged to `memory/logs/events/telegram.jsonl`.
+- [x] Failure logs redact bot tokens, bearer tokens, and `secret_ref:` values.
+- [x] Daemon Telegram readiness uses configured token env and allowlist count without returning token values.
+
+## M11 Checklist
+
+- [x] Critical strip shows approvals, failed jobs, risk halt, and usage cost.
+- [x] Today Top 3 is derived from pending approvals, runtime tasks, and scheduled jobs.
+- [x] Active Work combines runtime and engineering tasks.
+- [x] Daily Briefing panel reads the latest briefing summary.
+- [x] Usage panel shows calls, cost, tokens, and failures.
+- [x] Memory Updates panel shows index count and recent titles.
+- [x] Trading Watch remains visible with gate and dry-run state.
+- [x] Logs panel filters action, approval, trading, usage, and error categories.
+- [x] Settings panel shows provider, Telegram, memory, and trading status without secrets.
+- [x] Approval actions can call a daemon-backed approval client.
+- [x] Chat MVP surface supports basic local slash commands.
+- [x] Tasks & Schedules surface shows runtime tasks and scheduled jobs.
+- [x] Daemon `/logs/recent` reads event, usage, and trading JSONL records.
+
+## M12 Checklist
+
+- [x] Profile memory records can be written.
+- [x] Project memory records can be written.
+- [x] Topic/decision/routine/trading/engineering/log record paths are supported.
+- [x] User preference updates mark prior records `superseded`.
+- [x] New updated records link to the superseded record.
+- [x] Sensitive memory returns an approval request before writing wiki content.
+- [x] Daemon sensitive memory route stores the approval in runtime approval queue.
+- [x] Raw source text is stored separately under `memory/raw/inbox`.
+- [x] Wiki records reference raw sources through `source_refs`.
+- [x] Active context is persisted under `memory/operations/active_context.md`.
+- [x] Tasks, reminders, open questions, and approvals operation files are persisted.
+- [x] Wiki index is updated and searchable.
+- [x] Records can be marked stale.
+- [x] Records can record conflict notes.
+
+## M13 Checklist
+
+- [x] Tool registry includes file read.
+- [x] Tool registry includes controlled file edit.
+- [x] Tool registry includes allowlisted verification command execution.
+- [x] Tool registry includes repo inspection.
+- [x] Tool registry includes documentation write.
+- [x] Workflow includes intake, plan, patch, verify, review, summarize, and memory reflection.
+- [x] Workflow steps are associated with task log events.
+- [x] Code review findings sort bugs/regressions/missing tests before style.
+- [x] Code review findings carry file/line references.
+- [x] Engineering outcomes can write project memory records.
+- [x] Engineering outcomes can write decision memory records.
+- [x] Broad file edits require approval.
+- [x] Destructive commands require approval.
+- [x] External mutations require approval.
+
+## M14 Checklist
+
+- [x] Market data source status reports Korea and US watchlist state.
+- [x] Missing market data blocks signal readiness.
+- [x] Stale market data blocks signal readiness.
+- [x] Conflicting market data blocks signal readiness.
+- [x] Strategy templates exist for momentum watch, mean reversion watch, portfolio rebalance, event watch, and long-term thesis.
+- [x] Strategy templates include review cadence.
+- [x] Strategy signals are deterministic from quote inputs.
+- [x] Paper journal entries are separate from dry-run entries.
+- [x] Paper journal entries record that no broker order was submitted.
+- [x] Trading journal summary reports dry-run and paper counts.
+- [x] Daemon trading status exposes market data source and paper journal summaries.
+- [x] Desktop Trading panel shows market data and paper journal summaries.
+
+## M15 Checklist
+
+- [x] MVP acceptance audit covers `docs/drafts/26_ACCEPTANCE_CRITERIA.md`.
+- [x] Every local MVP failure criterion is audited false.
+- [x] Deferred broker/API work is explicitly classified as post-MVP M16-M17.
+- [x] Eval runbook covers memory, engineering, review, trading, proposal, and daily briefing scenarios.
+- [x] Hermes MVP parity checklist covers CLI/TUI, sessions, skills, scheduler, tools, MCP, and token/cost visibility.
+- [x] Slash command parity plan covers `/new`, `/reset`, `/model`, `/usage`, `/skills`, `/stop`, `/status`, and `/sethome`.
+- [x] Session lifecycle plan covers reset, resume, stop, queueing, interruption, and crash recovery.
+- [x] Local onboarding guide documents daemon, desktop, Telegram, memory, and safe credential setup.
+- [x] Security audit confirms real trading remains disabled and secrets stay out of logs/UI/docs.
+
+## M18 Checklist
+
+- [x] Settings config validation is visible in desktop without exposing secrets.
+- [x] Memory Explorer detail view shows wiki records, raw source refs, stale markers, conflict notes, and sensitive approval state.
+- [x] Tasks/Schedules detail view shows runtime tasks, cancellation, scheduled jobs, and recent execution history.
+- [x] Logs search covers action, approval, usage, trading, Telegram, and error records with category/text/date filters.
+- [x] Approval UX shows risk context and decision audit result.
+- [x] Daemon-backed loading, empty, error, and offline states are tested for the first M18 slice.
+
+## M19 Checklist
+
+- [x] Structured daemon health report is available through `GET /health`.
+- [x] Daemon `/status` includes a health summary for desktop and Telegram consumers.
+- [x] `doctor` CLI uses the same structured health evaluator and exits non-zero on required failures.
+- [x] Desktop status aggregation maps daemon health summary.
+- [x] Telegram `/status` includes daemon health state without exposing credential values.
+- [x] Scheduler restart/recovery state covers next run, failure count, and retry status.
+- [x] Runtime JSON/JSONL writes use a corruption-resistant persistence boundary.
+- [x] Runtime state backup/recovery notes cover memory, tasks, approvals, and logs.
+- [x] Local auth/token setup runbook and daemon diagnostics are documented.
+
+## M20 Checklist
+
+- [x] Duplicate memory detection returns merge/supersede suggestions.
+- [x] Stale-memory review queue includes source references and last-seen timestamps.
+- [x] Conflict review queue lists contradictory record notes.
+- [x] Ranked memory search considers active/stale state, source quality, type, and recency.
+- [x] Memory maintenance eval scenarios are documented.
+- [x] Memory quality review is visible through daemon and desktop surfaces.
+
+## M21 Checklist
+
+- [x] Task view exposes plan, patch, verify, review, and memory-reflection stages.
+- [x] Failed test summary and likely next action generation are implemented.
+- [x] Risk review before broad edits, destructive commands, or external mutations is surfaced in the workflow.
+- [x] Code-review report storage and UI exposure with severity ordering are implemented.
+- [x] Engineering memory reflection improvements cover decisions, regressions, and follow-up tasks.
 
 ## Verification Log
 
@@ -386,17 +641,207 @@ Update it whenever development state changes.
 - 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after project status audit.
 - 2026-06-22: Docs relative link check passed after project status audit docs update.
 - 2026-06-22: Changed-file and audit-file secret-like scan found no plaintext secret values after project status audit.
+- 2026-06-22: Draft requirement coverage audit updated `docs/plan`; docs/plan relative link check passed.
+- 2026-06-22: M7 runtime API TDD red phase confirmed with missing `ApprovalRequestSchema` and missing daemon runtime endpoints.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/contracts/src/contracts.test.ts apps/daemon/src/runtime-api.test.ts` passed after M7 runtime API implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M7 runtime API implementation, 16 files and 94 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M7 runtime API implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M7 runtime API implementation.
+- 2026-06-22: M8 provider gateway TDD red phase confirmed with missing `createModelGateway`, `createBudgetGuard`, and `createProviderRegistry`.
+- 2026-06-22: M8 usage contract and soft-limit warning red phase confirmed with missing `LlmUsageRecordSchema` and warning payload.
+- 2026-06-22: M8 daemon status red phase confirmed missing provider auth mode/reason fields.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/contracts/src/contracts.test.ts packages/model-gateway/src/routing.test.ts` passed after M8 model gateway implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/status.test.ts packages/model-gateway/src/routing.test.ts` passed after daemon provider status integration.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M8 implementation, 16 files and 100 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M8 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M8 implementation.
+- 2026-06-22: M9 briefing job TDD red phase confirmed with missing `runBriefingJob`.
+- 2026-06-22: M9 scheduler execution red phase confirmed with missing `executeScheduledJob`.
+- 2026-06-22: M9 daemon scheduled briefing red phase confirmed because `/briefings/run` used manual trigger semantics.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/runtime-api.test.ts packages/briefing/src/briefing.test.ts packages/scheduler/src/scheduler.test.ts` passed after M9 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M9 implementation, 16 files and 106 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M9 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M9 implementation.
+- 2026-06-22: M10 Telegram operational bot TDD red phase confirmed with missing daemon context, push, notification, and redaction APIs.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/telegram/src/telegram.test.ts apps/daemon/src/status.test.ts` passed after M10 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M10 implementation, 16 files and 113 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M10 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M10 implementation.
+- 2026-06-22: M11 desktop operating console TDD red phase confirmed with missing `/logs/recent`, status aggregation, product sections, approval client hook, log filtering, and chat surface.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts apps/daemon/src/runtime-api.test.ts` passed after M11 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M11 implementation, 16 files and 118 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M11 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M11 implementation.
+- 2026-06-22: M12 memory flow TDD red phase confirmed with missing memory writer, operational writer, search, stale/conflict marking, and daemon memory route.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/memory/src/bootstrap.test.ts apps/daemon/src/runtime-api.test.ts` passed after M12 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M12 implementation, 16 files and 124 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M12 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M12 implementation.
+- 2026-06-22: M13 development agent productization TDD red phase confirmed with missing tool registry, workflow, review ordering, memory reflection, and high-risk approval assessment APIs.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed after M13 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M13 implementation, 16 files and 129 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M13 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M13 implementation.
+- 2026-06-22: M14 trading TDD red phase confirmed with missing market data source status, strategy templates, paper journal, trading journal summary, and status/dashboard visibility.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts apps/daemon/src/status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts` passed after M14 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M14 implementation, 16 files and 135 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M14 implementation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M14 implementation.
+- 2026-06-22: M15 MVP acceptance audit, eval runbook, Hermes parity checklist, session lifecycle plan, and local onboarding/security audit documented.
+- 2026-06-22: docs/plan relative link check passed after M15 updates, 27 links checked.
+- 2026-06-22: `git diff --check` passed after M15 updates.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M15 updates, 16 files and 135 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M15 updates.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M15 updates.
+- 2026-06-22: M16 broker connector input packet documented and linked from plan/status docs.
+- 2026-06-22: docs/plan relative link check passed after M16 input packet, 33 links checked.
+- 2026-06-22: `git diff --check` passed after M16 input packet.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M16 input packet, 16 files and 135 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M16 input packet.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M16 input packet.
+- 2026-06-22: M16 readiness evaluator TDD red phase confirmed with missing `assessBrokerConnectorInputPacket`.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts` passed after M16 readiness evaluator, 16 files and 138 tests.
+- 2026-06-22: docs/plan relative link check passed after M16 readiness evaluator, 33 links checked.
+- 2026-06-22: `git diff --check` passed after M16 readiness evaluator.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M16 readiness evaluator, 16 files and 138 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M16 readiness evaluator.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M16 readiness evaluator.
+- 2026-06-22: M16 input packet file loader and `trading:m16-check` CLI TDD red phase confirmed.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/trading/src/trading.test.ts apps/daemon/src/trading-m16-check.test.ts` passed after M16 CLI, 17 files and 142 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 trading:m16-check configs/m16-broker-input.example.json` returned blocked with exit code 1 as expected.
+- 2026-06-22: docs/plan relative link check passed after M16 CLI, 33 links checked.
+- 2026-06-22: `git diff --check` passed after M16 CLI.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M16 CLI, 17 files and 142 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M16 CLI.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M16 CLI.
+- 2026-06-22: Roadmap updated to pause M16/M17 and add M18-M21 local product hardening sequence.
+- 2026-06-22: M18 desktop operations TDD red phase confirmed for missing config validation, memory explorer details, log search, approval risk context, and memory-index metadata.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts` passed after M18 desktop slice, 17 files and 144 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/runtime-api.test.ts` passed after M18 memory metadata, 17 files and 144 tests.
+- 2026-06-22: docs/plan relative link check passed after M18 desktop slice, 32 links checked.
+- 2026-06-22: `git diff --check` passed after M18 desktop slice.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M18 desktop slice, 17 files and 144 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M18 desktop slice.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M18 desktop slice.
+- 2026-06-22: M18 task/schedule TDD red phase confirmed for missing desktop task cancellation, daemon task client, scheduler run metadata mapping, and daemon scheduler recent-run status.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts apps/daemon/src/runtime-api.test.ts` passed after M18 task/schedule slice, 17 files and 146 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M18 task/schedule slice, 17 files and 146 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M18 task/schedule slice.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M18 task/schedule slice.
+- 2026-06-22: docs/plan relative link check passed after M18 task/schedule slice, 32 links checked.
+- 2026-06-22: `git diff --check` passed after M18 task/schedule slice.
+- 2026-06-22: M18 log date-filter TDD red phase confirmed for missing desktop Log date input and dropped `/logs/recent` time metadata.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/Dashboard.test.tsx apps/desktop/src/renderer/daemon-status.test.ts` passed after M18 log date-filter slice, 17 files and 147 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M18 log date-filter slice, 17 files and 147 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M18 log date-filter slice.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M18 log date-filter slice.
+- 2026-06-22: docs/plan relative link check passed after M18 log date-filter slice, 32 links checked.
+- 2026-06-22: `git diff --check` passed after M18 log date-filter slice.
+- 2026-06-22: M19 health/doctor TDD red phase confirmed for missing `/health`, missing `/status.health`, missing `runDoctor`, and missing desktop/Telegram health mapping.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/status.test.ts` passed after M19 health/doctor slice, 17 files and 150 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/daemon-status.test.ts` passed after M19 desktop health mapping, 17 files and 150 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/telegram/src/telegram.test.ts` passed after M19 Telegram health status, 17 files and 150 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M19 health/doctor slice, 17 files and 150 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M19 health/doctor slice.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M19 health/doctor slice.
+- 2026-06-22: `git diff --check` passed after M19 health/doctor slice.
+- 2026-06-22: docs/plan relative link check passed after M19 updates, 32 links checked.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed and reported degraded optional credentials without exposing values.
+- 2026-06-22: M19 scheduler recovery TDD red phase confirmed for missing `next_run_at`, `failure_count`, `retry_status`, and desktop mapping.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/runtime-api.test.ts` passed after M19 scheduler recovery, 17 files and 150 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/desktop/src/renderer/daemon-status.test.ts` passed after M19 scheduler desktop mapping, 17 files and 150 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/status.test.ts` passed after M19 scheduler failure recovery coverage, 17 files and 151 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M19 scheduler recovery, 17 files and 151 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M19 scheduler recovery.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M19 scheduler recovery.
+- 2026-06-22: `git diff --check` passed after M19 scheduler recovery.
+- 2026-06-22: docs/plan relative link check passed after M19 scheduler recovery, 32 links checked.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M19 scheduler recovery.
+- 2026-06-22: M19 persistence TDD red phase confirmed for missing reusable atomic JSON/JSONL helpers.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/core/src/event-log.test.ts` passed after M19 runtime persistence boundary, 17 files and 153 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M19 runtime persistence boundary, 17 files and 153 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M19 runtime persistence boundary.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M19 runtime persistence boundary.
+- 2026-06-22: `git diff --check` passed after M19 runtime persistence boundary.
+- 2026-06-22: docs/plan relative link check passed after M19 runtime persistence boundary, 32 links checked.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M19 runtime persistence boundary.
+- 2026-06-22: M19 runtime backup/recovery and local auth diagnostics documented in `docs/plan/LOCAL_ONBOARDING_SECURITY.md`.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M19 runbook documentation, 17 files and 153 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M19 runbook documentation.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M19 runbook documentation.
+- 2026-06-22: `git diff --check` passed after M19 runbook documentation.
+- 2026-06-22: docs/plan relative link check passed after M19 runbook documentation, 33 links checked.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M19 runbook documentation.
+- 2026-06-22: M20 memory quality TDD red phase confirmed for missing `reviewMemoryQuality` and ranked search metadata.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/memory/src/bootstrap.test.ts` passed after M20 memory quality primitives, 17 files and 155 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M20 memory quality primitives, 17 files and 155 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M20 memory quality primitives.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M20 memory quality primitives.
+- 2026-06-22: `git diff --check` passed after M20 memory quality primitives.
+- 2026-06-22: docs/plan relative link check passed after M20 memory quality primitives, 33 links checked.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M20 memory quality primitives.
+- 2026-06-22: M20 quality visibility red phase confirmed for missing daemon `GET /memory/quality`, desktop quality mapping, and Memory Explorer quality summary.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- apps/daemon/src/runtime-api.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after M20 daemon/desktop quality visibility, 17 files and 156 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M20 completion, 17 files and 156 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M20 completion.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M20 completion.
+- 2026-06-22: `git diff --check` passed after M20 completion.
+- 2026-06-22: docs/plan relative link check passed after M20 completion, 28 checked links in current status docs.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M20 completion.
+- 2026-06-22: M21 stage visibility red phase confirmed for missing engineering stages in daemon status, desktop mapping, and Engineering panel.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after M21 stage visibility, 17 files and 157 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M21 stage visibility, 17 files and 157 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M21 stage visibility.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M21 stage visibility.
+- 2026-06-22: `git diff --check` passed after M21 stage visibility.
+- 2026-06-22: docs/plan relative link check passed after M21 stage visibility, 28 checked links in current status docs.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M21 stage visibility.
+- 2026-06-22: M21 failed verification summary red phase confirmed for missing summary generation, daemon `failed_verification`, desktop mapping, and Engineering panel rendering.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after M21 failed verification summaries, 17 files and 160 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M21 failed verification summaries, 17 files and 160 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M21 failed verification summaries.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M21 failed verification summaries.
+- 2026-06-22: `git diff --check` passed after M21 failed verification summaries.
+- 2026-06-22: docs/plan relative link check passed after M21 failed verification summaries, 28 checked links in current status docs.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M21 failed verification summaries.
+- 2026-06-22: M21 code-review report visibility red phase confirmed for missing report event persistence, daemon review-report route, desktop mapping, and Engineering panel rendering.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after M21 code-review report visibility, 17 files and 163 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` initially caught a missing restore-helper `reviewReport` type, then passed after the type fix.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M21 code-review report visibility, 17 files and 163 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M21 code-review report visibility.
+- 2026-06-22: `git diff --check` passed after M21 code-review report visibility.
+- 2026-06-22: docs/plan relative link check passed after M21 code-review report visibility, 28 checked links in current status docs.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M21 code-review report visibility.
+- 2026-06-22: M21 workflow risk visibility red phase confirmed for missing risk review creation, daemon risk-review route, desktop mapping, and Engineering panel rendering.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after M21 workflow risk visibility, 17 files and 166 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 test` passed after M21 workflow risk visibility, 17 files and 166 tests.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build` passed after M21 workflow risk visibility.
+- 2026-06-22: `npx --yes pnpm@11.8.0 build:desktop` passed after M21 workflow risk visibility.
+- 2026-06-22: `git diff --check` passed after M21 workflow risk visibility.
+- 2026-06-22: docs/plan relative link check passed after M21 workflow risk visibility, 28 checked links in current status docs.
+- 2026-06-22: `npx --yes pnpm@11.8.0 doctor` passed after M21 workflow risk visibility.
+- 2026-06-23: M21 memory reflection red phase confirmed for missing decision/regression/follow-up sections in engineering memory records.
+- 2026-06-23: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed after M21 memory reflection improvements, 17 files and 167 tests.
+- 2026-06-23: `npx --yes pnpm@11.8.0 test` passed after M21 completion, 17 files and 167 tests.
+- 2026-06-23: `npx --yes pnpm@11.8.0 build` passed after M21 completion.
+- 2026-06-23: `npx --yes pnpm@11.8.0 build:desktop` passed after M21 completion.
+- 2026-06-23: `git diff --check` passed after M21 completion.
+- 2026-06-23: docs/plan relative link check passed after M21 completion, 31 links checked.
+- 2026-06-23: `npx --yes pnpm@11.8.0 doctor` passed after M21 completion.
 
 ## Known Constraints
 
 - `gh` CLI is not installed in the current environment, so automatic PR creation is unavailable.
 - WSL does not have a global `pnpm` binary. Verification used `npx --yes pnpm@11.8.0 ...`.
 - Broker credentials and detailed securities API information will be supplied later by the user.
-- Trading development must expose configuration and capability checks first; real trading remains disabled.
+- Real trading remains disabled.
+- M0-M15 are local MVP complete; M16-M17 are post-MVP broker/real-trading work.
+- M16 cannot begin safely without official broker/API documentation, API terms, account permission constraints, credential references, desired pilot risk limits, and explicit approval policy.
+- M16 input collection should use `docs/plan/M16_BROKER_CONNECTOR_INPUT_PACKET.md`.
+- M16 input readiness can be evaluated with `assessBrokerConnectorInputPacket` in `packages/trading`.
+- M16 input packet files can be checked with `npx --yes pnpm@11.8.0 trading:m16-check <packet.json>`.
+- M18-M21 local hardening is complete without broker/API inputs; real trading stays blocked.
 
 ## Next Action
 
-Continue M6 Pilot Real Trading Preparation:
-
-1. Wait for user-provided official broker/API details before connector planning.
-2. Keep all real broker/order paths blocked until official API, terms, credentials, approval, and risk gates are satisfied.
+No additional local-hardening milestone is currently defined after M21. Keep M16 blocked until the user supplies completed broker/API inputs.

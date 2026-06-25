@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDailyBriefingJob, InMemoryScheduleRegistry } from "./index.js";
+import { createDailyBriefingJob, executeScheduledJob, InMemoryScheduleRegistry } from "./index.js";
 
 describe("scheduler", () => {
   it("registers the daily briefing job at 06:00 KST", () => {
@@ -26,5 +26,48 @@ describe("scheduler", () => {
       })
     ).toThrow(/HH:mm/);
   });
-});
 
+  it("executes a registered daily briefing job handler", async () => {
+    const registry = new InMemoryScheduleRegistry();
+    let runs = 0;
+    const job = createDailyBriefingJob(registry, {
+      time: "06:00",
+      timezone: "Asia/Seoul",
+      run: async () => {
+        runs += 1;
+        return {
+          status: "partial",
+          output_ref: "memory/logs/daily/2026-06-22.json"
+        };
+      }
+    });
+
+    const result = await executeScheduledJob(registry, job.id);
+
+    expect(runs).toBe(1);
+    expect(result).toMatchObject({
+      job_id: "daily_briefing_0600_kst",
+      status: "completed",
+      output_ref: "memory/logs/daily/2026-06-22.json"
+    });
+  });
+
+  it("records scheduled job handler failures", async () => {
+    const registry = new InMemoryScheduleRegistry();
+    const job = createDailyBriefingJob(registry, {
+      time: "06:00",
+      timezone: "Asia/Seoul",
+      run: async () => {
+        throw new Error("briefing failed");
+      }
+    });
+
+    const result = await executeScheduledJob(registry, job.id);
+
+    expect(result).toMatchObject({
+      job_id: "daily_briefing_0600_kst",
+      status: "failed",
+      error_code: "scheduled_job_failed"
+    });
+  });
+});

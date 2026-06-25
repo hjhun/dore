@@ -52,7 +52,14 @@ describe("daemon engineering routes", () => {
       expect.objectContaining({
         id: "intake_2026_06_22_add_daemon_task_wrapper",
         title: "Add daemon task wrapper",
-        status: "planned"
+        status: "planned",
+        stages: expect.arrayContaining([
+          expect.objectContaining({ kind: "plan", status: "in_progress" }),
+          expect.objectContaining({ kind: "patch", status: "pending" }),
+          expect.objectContaining({ kind: "verify", status: "pending" }),
+          expect.objectContaining({ kind: "review", status: "pending" }),
+          expect.objectContaining({ kind: "memory_reflection", status: "pending" })
+        ])
       })
     );
   });
@@ -123,6 +130,71 @@ describe("daemon engineering routes", () => {
         id: taskId,
         status: "completed",
         last_command: "pnpm test"
+      })
+    );
+  });
+
+  it("records failed engineering verification summaries and likely next actions", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot: "/workspace/dore",
+      engineeringExecFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/m21\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      }
+    });
+
+    const intakeResponse = await app.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Summarize failed verification",
+        now: "2026-06-22T09:00:00.000Z"
+      }
+    });
+    const taskId = intakeResponse.json().task_id;
+
+    const executionResponse = await app.inject({
+      method: "POST",
+      url: `/engineering/tasks/${taskId}/executions`,
+      payload: {
+        command: "pnpm build",
+        exit_code: 2,
+        started_at: "2026-06-22T09:00:00.000Z",
+        completed_at: "2026-06-22T09:00:04.000Z",
+        output: "src/app.ts(12,5): error TS2304: Cannot find name 'missingValue'."
+      }
+    });
+
+    expect(executionResponse.statusCode).toBe(201);
+    expect(executionResponse.json()).toMatchObject({
+      task_status: "failed",
+      failed_verification: {
+        command: "pnpm build",
+        summary: "pnpm build failed with exit code 2.",
+        likely_next_action: "Fix the TypeScript/build error, then rerun pnpm build.",
+        output_summary: "src/app.ts(12,5): error TS2304: Cannot find name 'missingValue'."
+      }
+    });
+
+    const statusResponse = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+    expect(statusResponse.json().engineering.tasks).toContainEqual(
+      expect.objectContaining({
+        id: taskId,
+        status: "failed",
+        failed_verification: expect.objectContaining({
+          summary: "pnpm build failed with exit code 2.",
+          likely_next_action: "Fix the TypeScript/build error, then rerun pnpm build."
+        })
       })
     );
   });
@@ -227,6 +299,139 @@ describe("daemon engineering routes", () => {
     expect(runResponse.statusCode).toBe(201);
     expect(runResponse.json().execution.status).toBe("passed");
     expect(runResponse.json().task_status).toBe("completed");
+  });
+
+  it("stores severity-ordered code review reports for engineering tasks", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot: "/workspace/dore",
+      engineeringExecFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/m21\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      }
+    });
+    const intakeResponse = await app.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Store code review report",
+        now: "2026-06-22T10:00:00.000Z"
+      }
+    });
+    const taskId = intakeResponse.json().task_id;
+
+    const reviewResponse = await app.inject({
+      method: "POST",
+      url: `/engineering/tasks/${taskId}/review-report`,
+      payload: {
+        findings: [
+          {
+            category: "style",
+            severity: "low",
+            file: "src/view.ts",
+            line: 40,
+            message: "Name can be clearer."
+          },
+          {
+            category: "bug",
+            severity: "high",
+            file: "src/runner.ts",
+            line: 12,
+            message: "Cancellation result is ignored."
+          }
+        ]
+      }
+    });
+
+    expect(reviewResponse.statusCode).toBe(201);
+    expect(reviewResponse.json().review_report.findings.map((finding: { reference: string }) => finding.reference)).toEqual([
+      "src/runner.ts:12",
+      "src/view.ts:40"
+    ]);
+    expect(await readFile(reviewResponse.json().event_log, "utf8")).toContain("Engineering code review report recorded");
+
+    const statusResponse = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+    expect(statusResponse.json().engineering.tasks).toContainEqual(
+      expect.objectContaining({
+        id: taskId,
+        review_report: expect.objectContaining({
+          findings: [
+            expect.objectContaining({ category: "bug", reference: "src/runner.ts:12" }),
+            expect.objectContaining({ category: "style", reference: "src/view.ts:40" })
+          ]
+        })
+      })
+    );
+  });
+
+  it("stores high-risk engineering action reviews for workflow visibility", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot: "/workspace/dore",
+      engineeringExecFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/m21\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      }
+    });
+    const intakeResponse = await app.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Review workflow risk",
+        now: "2026-06-22T10:30:00.000Z"
+      }
+    });
+    const taskId = intakeResponse.json().task_id;
+
+    const riskResponse = await app.inject({
+      method: "POST",
+      url: `/engineering/tasks/${taskId}/risk-review`,
+      payload: {
+        kind: "destructive_command",
+        target: "rm -rf memory"
+      }
+    });
+
+    expect(riskResponse.statusCode).toBe(201);
+    expect(riskResponse.json()).toMatchObject({
+      risk_review: {
+        kind: "destructive_command",
+        target: "rm -rf memory",
+        approval_required: true,
+        risk_level: "critical",
+        reason: "Destructive command requires approval: rm -rf memory"
+      }
+    });
+    expect(await readFile(riskResponse.json().event_log, "utf8")).toContain("Engineering risk review recorded");
+
+    const statusResponse = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+    expect(statusResponse.json().engineering.tasks).toContainEqual(
+      expect.objectContaining({
+        id: taskId,
+        risk_review: expect.objectContaining({
+          approval_required: true,
+          risk_level: "critical"
+        })
+      })
+    );
   });
 
   it("rejects disallowed engineering task commands", async () => {
