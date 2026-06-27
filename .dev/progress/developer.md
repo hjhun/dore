@@ -3,7 +3,7 @@
 ## Status
 
 - State: complete
-- Last updated: 2026-06-27 14:49 KST
+- Last updated: 2026-06-27 14:34 KST
 
 ## Inputs Reviewed
 
@@ -38,8 +38,6 @@
 - `apps/daemon/src/health.ts`
 - `apps/daemon/src/status.test.ts`
 - Official OpenAI docs for API key auth, Codex auth, and workload identity federation
-- `apps/daemon/src/engineering-route.test.ts`
-- Local Codex CLI help and local Codex OAuth auth metadata
 
 ## Current Work
 
@@ -68,7 +66,6 @@
 - Completed M21 workflow risk review visibility slice.
 - Completed M21 engineering memory-reflection improvements.
 - Current implementation slice: OpenAI workload identity authentication support for Dore.
-- Current implementation slice: Codex OAuth-backed local runner integration.
 - M16/M17 remain blocked on broker/API inputs.
 
 ## 2026-06-27 OpenAI Workload Identity Auth Slice
@@ -78,19 +75,6 @@
 - Added model-gateway support for `OPENAI_AUTH_MODE=workload_identity`, official token exchange against `https://auth.openai.com/oauth/token`, and secret-safe usage records.
 - Added daemon health/status visibility for workload identity readiness without exposing subject tokens or access tokens.
 - Updated config example and LLM/runtime draft docs to replace the old browser-OAuth assumption with official API key and workload identity modes.
-
-## 2026-06-27 Codex OAuth-backed Runner Slice
-
-- Added Codex runner readiness metadata from the local Codex CLI and
-  `auth.json` without exposing access or refresh token values.
-- Added `runCodexAgentTask` to invoke `codex exec --cd <project> --json`
-  through an injected executor and reuse the existing redacted execution record.
-- Added `appendCodexAgentRunEvent` so Codex runner outcomes are logged without
-  token fields or token values.
-- Added daemon `/status.engineering.codex_runner` and
-  `POST /engineering/tasks/:id/codex-run`.
-- Verified real local `codex exec` succeeds with the existing Codex OAuth
-  session and that daemon status exposes only token-presence booleans.
 
 ## Tests And Verification
 
@@ -165,15 +149,6 @@
   - WIF-mode daemon smoke on port 3199 passed; `/status` returned OpenAI `auth_mode: workload_identity`, configured true, and `trading.real_trading_enabled: false`.
   - Final auth contract cleanup removed stale `oauth` usage-record auth mode.
   - Final verification passed: `git diff --check`, `npx --yes pnpm@11.8.0 test`, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, and `npx --yes pnpm@11.8.0 doctor`.
-- Codex runner red phase: targeted tests failed for missing
-  `createCodexRunnerStatus`, `runCodexAgentTask`,
-  `appendCodexAgentRunEvent`, daemon Codex runner status, and daemon
-  `codex-run` route.
-- Codex runner green phase:
-  - `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts` passed, 17 files and 184 tests.
-  - `codex exec --cd /home/hjhun/samba/workspace/dore --json 'Return only the word ready.'` passed with the local OAuth session.
-  - Daemon smoke on port 3198 returned `engineering.codex_runner.available: true`, `auth_mode: chatgpt`, and no token values.
-  - Full verification passed: `git diff --check`, `npx --yes pnpm@11.8.0 test`, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, and `npx --yes pnpm@11.8.0 doctor`.
   - `docs/plan/MILESTONE_15_MVP_ACCEPTANCE_AUDIT.md`
   - `docs/plan/EVAL_RUNBOOK.md`
   - `docs/plan/HERMES_MVP_PARITY.md`
@@ -374,9 +349,6 @@
 - Keep M20 memory quality primitives Markdown/frontmatter-based until daemon or desktop surfaces require a broader index.
 - Keep M21 memory reflection Markdown/frontmatter-based and use the existing `engineering` memory record type for follow-up tasks.
 - Do not reuse browser OAuth, ChatGPT, or Codex login sessions as Dore OpenAI API credentials; use official API key mode or official workload identity federation mode.
-- Use the local Codex CLI as the boundary for ChatGPT/Codex OAuth-backed work;
-  Dore records runner status and output, but does not read or log raw token
-  values.
 
 ## Blockers
 

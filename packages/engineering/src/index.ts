@@ -163,30 +163,6 @@ export interface ExecuteAllowedCommandInput {
   execFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
 }
 
-export interface CodexRunnerStatus {
-  available: boolean;
-  cli_available: boolean;
-  auth_file_present: boolean;
-  auth_mode?: string;
-  has_access_token: boolean;
-  has_refresh_token: boolean;
-  last_refresh?: string;
-  reason?: "missing_cli" | "missing_auth" | "missing_tokens" | "invalid_auth";
-}
-
-export interface CreateCodexRunnerStatusInput {
-  authFilePath?: string;
-  authJson?: string;
-  execFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
-}
-
-export interface RunCodexAgentTaskInput {
-  prompt: string;
-  projectRoot: string;
-  now: string;
-  execFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
-}
-
 export interface ApplyControlledFileEditInput {
   projectRoot: string;
   relativePath: string;
@@ -735,94 +711,6 @@ export async function executeAllowedCommand(input: ExecuteAllowedCommandInput): 
   }
 }
 
-export async function createCodexRunnerStatus(input: CreateCodexRunnerStatusInput = {}): Promise<CodexRunnerStatus> {
-  const execFile = input.execFile ?? defaultExecFile;
-  let cliAvailable = false;
-  try {
-    await execFile("codex", ["--version"]);
-    cliAvailable = true;
-  } catch {
-    return {
-      available: false,
-      cli_available: false,
-      auth_file_present: false,
-      has_access_token: false,
-      has_refresh_token: false,
-      reason: "missing_cli"
-    };
-  }
-
-  let authJson: string;
-  try {
-    authJson = input.authJson ?? (await readFile(input.authFilePath ?? defaultCodexAuthFilePath(), "utf8"));
-  } catch {
-    return {
-      available: false,
-      cli_available: cliAvailable,
-      auth_file_present: false,
-      has_access_token: false,
-      has_refresh_token: false,
-      reason: "missing_auth"
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(authJson) as Record<string, unknown>;
-    const tokens = typeof parsed.tokens === "object" && parsed.tokens ? (parsed.tokens as Record<string, unknown>) : {};
-    const hasAccessToken = typeof tokens.access_token === "string" && tokens.access_token.length > 0;
-    const hasRefreshToken = typeof tokens.refresh_token === "string" && tokens.refresh_token.length > 0;
-    const hasTokens = hasAccessToken || hasRefreshToken;
-    return {
-      available: cliAvailable && hasTokens,
-      cli_available: cliAvailable,
-      auth_file_present: true,
-      auth_mode: typeof parsed.auth_mode === "string" ? parsed.auth_mode : undefined,
-      has_access_token: hasAccessToken,
-      has_refresh_token: hasRefreshToken,
-      last_refresh: typeof parsed.last_refresh === "string" ? parsed.last_refresh : undefined,
-      reason: hasTokens ? undefined : "missing_tokens"
-    };
-  } catch {
-    return {
-      available: false,
-      cli_available: cliAvailable,
-      auth_file_present: true,
-      has_access_token: false,
-      has_refresh_token: false,
-      reason: "invalid_auth"
-    };
-  }
-}
-
-export async function runCodexAgentTask(input: RunCodexAgentTaskInput): Promise<TestExecutionRecord> {
-  const execFile = input.execFile ?? defaultExecFile;
-  const prompt = input.prompt.trim();
-  if (!prompt) {
-    throw new Error("Codex agent task requires a non-empty prompt.");
-  }
-  try {
-    const result = await execFile("codex", ["exec", "--cd", input.projectRoot, "--json", prompt], {
-      cwd: input.projectRoot
-    });
-    return createTestExecutionRecord({
-      command: "codex exec",
-      exitCode: 0,
-      startedAt: input.now,
-      completedAt: new Date().toISOString(),
-      output: [result.stdout, result.stderr ?? ""].filter(Boolean).join("\n")
-    });
-  } catch (error) {
-    const failure = normalizeExecFailure(error);
-    return createTestExecutionRecord({
-      command: "codex exec",
-      exitCode: failure.exitCode,
-      startedAt: input.now,
-      completedAt: new Date().toISOString(),
-      output: failure.output
-    });
-  }
-}
-
 export async function applyControlledFileEdit(input: ApplyControlledFileEditInput): Promise<FileEditRecord> {
   const relativePath = normalizeRelativeEditPath(input.projectRoot, input.relativePath);
   if (!input.find) {
@@ -1034,30 +922,6 @@ export async function appendTestExecutionEvent(
     duration_ms: execution.durationMs,
     output_summary: execution.outputSummary,
     failed_verification: failedVerification ? toFailedVerificationEvent(failedVerification) : undefined
-  });
-}
-
-export async function appendCodexAgentRunEvent(
-  eventLogPath: string,
-  intake: ProjectIntake,
-  run: TestExecutionRecord
-): Promise<void> {
-  const passed = run.status === "passed";
-  await appendEvent(eventLogPath, {
-    id: `event_${intake.id}_codex_${run.status}`,
-    time: new Date().toISOString(),
-    actor: "dore",
-    event_type: passed ? "task_completed" : "task_updated",
-    entity_type: "task",
-    entity_id: intake.id,
-    summary: `Codex agent run ${run.status}: ${run.command}`,
-    risk_level: "execute",
-    refs: ["codex_agent_run"],
-    command: run.command,
-    status: run.status,
-    exit_code: run.exitCode,
-    duration_ms: run.durationMs,
-    output_summary: run.outputSummary
   });
 }
 
@@ -1345,11 +1209,6 @@ function sanitizeExecutionOutput(output: string): string {
     .replace(/\b(OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|TELEGRAM_BOT_TOKEN)=\S+/g, "$1=<redacted>")
     .replace(/\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY))=\S+/g, "$1=<redacted>")
     .replace(/\bsk-[A-Za-z0-9_-]+/g, "<redacted>");
-}
-
-function defaultCodexAuthFilePath(): string {
-  const codexHome = process.env.CODEX_HOME || (process.env.HOME ? join(process.env.HOME, ".codex") : ".codex");
-  return join(codexHome, "auth.json");
 }
 
 function renderDraftMarkdown(label: string, draft: DraftDocument): string {
