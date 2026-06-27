@@ -30,12 +30,12 @@ the official broker/API fields and explicit approval are filled.
 
 | Field | Required value |
 | --- | --- |
-| Broker or exchange name |  |
-| Target market | Korea stocks / US stocks / ETF / other |
+| Broker or exchange name | Toss Securities |
+| Target market | To be confirmed with official API specs |
 | Account type | cash / margin / retirement / other |
 | API environment | production / sandbox / paper / read-only |
-| Official documentation URL or local file |  |
-| Official terms URL or local file |  |
+| Official documentation URL or local file | Pending user-provided official API specs |
+| Official terms URL or local file | Pending user-provided official terms |
 | User-approved connector scope | market data / account read / paper order / real order |
 
 ## Official Source Evidence
@@ -122,7 +122,7 @@ M16 should prefer the smallest connector that improves safety evidence:
 
 All items must be true before M16 implementation begins:
 
-- [ ] official broker/API target is selected.
+- [x] official broker/API target is selected: Toss Securities.
 - [ ] official API documentation is supplied.
 - [ ] official terms and account permission constraints are supplied.
 - [ ] API authentication and credential requirements are understood.

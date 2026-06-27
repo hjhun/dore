@@ -27,6 +27,31 @@ const RiskLimitGateSchema = z
   })
   .default({});
 
+const WorkloadIdentityConfigSchema = z
+  .object({
+    subject_token_env: z.string().default("OPENAI_WIF_SUBJECT_TOKEN"),
+    identity_provider_id_env: z.string().default("OPENAI_WIF_IDENTITY_PROVIDER_ID"),
+    service_account_id_env: z.string().default("OPENAI_WIF_SERVICE_ACCOUNT_ID"),
+    token_url: z.string().url().default("https://auth.openai.com/oauth/token")
+  })
+  .default({});
+
+const OpenAiProviderConfigSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    auth_mode: z.enum(["api_key", "workload_identity"]).default("api_key"),
+    api_key_env: z.string().default("OPENAI_API_KEY"),
+    workload_identity: WorkloadIdentityConfigSchema,
+    default_model: z.string().default("gpt-5.4")
+  })
+  .default({});
+
+const LlmProvidersConfigSchema = z
+  .object({
+    openai: OpenAiProviderConfigSchema
+  })
+  .default({});
+
 const RealTradingGateSchema = z
   .object({
     explicit_enable: z.boolean().default(false),
@@ -59,7 +84,8 @@ export const DoreConfigSchema = z.object({
   llm: z
     .object({
       default_provider: z.enum(["openai", "claude", "gemini"]).default("openai"),
-      default_model: z.string().default("gpt-5.4")
+      default_model: z.string().default("gpt-5.4"),
+      providers: LlmProvidersConfigSchema
     })
     .default({}),
   telegram: z

@@ -64,7 +64,11 @@ OpenAI는 API key 외에 OAuth 계열 연결 방식을 지원한다.
 
 요구사항:
 
-- OpenAI provider는 `api_key`와 `oauth` auth mode를 모두 지원한다.
+- OpenAI provider는 일반 API 호출에 `api_key`를 기본으로 사용한다.
+- 장기 비밀 키를 피해야 하는 신뢰된 workload에서는 공식 OpenAI workload
+  identity federation을 통해 `workload_identity` auth mode를 사용할 수 있다.
+- 브라우저 OAuth 또는 ChatGPT/Codex 로그인 세션은 Dore의 OpenAI API
+  credential로 재사용하지 않는다.
 - 기본값은 `api_key`다.
 - OAuth 연결은 사용자가 명시적으로 선택했을 때만 수행한다.
 - OAuth token은 안전한 credential store에 저장한다.
@@ -88,9 +92,11 @@ llm:
       enabled: true
       auth_mode: api_key
       api_key_env: OPENAI_API_KEY
-      oauth:
-        enabled: true
-        token_store: os_keychain
+      workload_identity:
+        subject_token_env: OPENAI_WIF_SUBJECT_TOKEN
+        identity_provider_id_env: OPENAI_WIF_IDENTITY_PROVIDER_ID
+        service_account_id_env: OPENAI_WIF_SERVICE_ACCOUNT_ID
+        token_url: https://auth.openai.com/oauth/token
       default_model: gpt-5.4
       task_models:
         high_reasoning: gpt-5.5

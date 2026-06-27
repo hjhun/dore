@@ -165,7 +165,7 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
     });
 
     const providerStatus = Object.fromEntries(
-      createProviderRegistry().status().map((provider) => [
+      createProviderRegistry({ env: daemonEnv }).status().map((provider) => [
         provider.provider,
         {
           configured: provider.available,

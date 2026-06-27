@@ -112,6 +112,27 @@ describe("runtime contracts", () => {
     expect(usage.auth_mode).toBe("api_key");
   });
 
+  it("validates workload identity LLM usage records", () => {
+    const usage = LlmUsageRecordSchema.parse({
+      id: "usage_20260627_openai",
+      task_id: "task_20260627_000001",
+      provider: "openai",
+      model: "gpt-5.4",
+      auth_mode: "workload_identity",
+      category: "assistant",
+      started_at: "2026-06-27T05:30:00.000Z",
+      ended_at: "2026-06-27T05:30:01.000Z",
+      input_tokens: 100,
+      output_tokens: 50,
+      cache_tokens: 0,
+      estimated_cost_usd: 0.03,
+      latency_ms: 1000,
+      status: "success"
+    });
+
+    expect(usage.auth_mode).toBe("workload_identity");
+  });
+
   it("validates dry-run trading signals", () => {
     const signal = TradingSignalSchema.parse({
       signal_id: "signal_20260621_000001",

@@ -6,6 +6,17 @@ app:
 llm:
   default_provider: openai
   default_model: gpt-5.4
+  providers:
+    openai:
+      enabled: true
+      auth_mode: api_key
+      api_key_env: OPENAI_API_KEY
+      workload_identity:
+        subject_token_env: OPENAI_WIF_SUBJECT_TOKEN
+        identity_provider_id_env: OPENAI_WIF_IDENTITY_PROVIDER_ID
+        service_account_id_env: OPENAI_WIF_SERVICE_ACCOUNT_ID
+        token_url: https://auth.openai.com/oauth/token
+      default_model: gpt-5.4
 
 telegram:
   enabled: true

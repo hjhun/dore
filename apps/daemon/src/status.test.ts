@@ -86,6 +86,53 @@ describe("daemon status", () => {
     expect(lines).toContain("trading.safety: ok (real trading disabled by default)");
   });
 
+  it("reports OpenAI workload identity health without exposing tokens", async () => {
+    const lines: string[] = [];
+    const result = await runDoctor({
+      env: {
+        OPENAI_AUTH_MODE: "workload_identity",
+        OPENAI_WIF_SUBJECT_TOKEN: "external-oidc-token",
+        OPENAI_WIF_IDENTITY_PROVIDER_ID: "wip_123",
+        OPENAI_WIF_SERVICE_ACCOUNT_ID: "svc_123"
+      },
+      stdout: (line) => lines.push(line)
+    });
+
+    expect(result.report.checks).toContainEqual(
+      expect.objectContaining({
+        id: "openai.credentials",
+        status: "ok",
+        detail: "workload identity env"
+      })
+    );
+    expect(lines.join("\n")).not.toContain("external-oidc-token");
+  });
+
+  it("exposes OpenAI workload identity provider status through daemon status", async () => {
+    const app = createDaemonApp({
+      env: {
+        OPENAI_AUTH_MODE: "workload_identity",
+        OPENAI_WIF_SUBJECT_TOKEN: "external-oidc-token",
+        OPENAI_WIF_IDENTITY_PROVIDER_ID: "wip_123",
+        OPENAI_WIF_SERVICE_ACCOUNT_ID: "svc_123"
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.providers.openai).toMatchObject({
+      configured: true,
+      auth_mode: "workload_identity",
+      model: "gpt-5.4"
+    });
+    expect(JSON.stringify(body)).not.toContain("external-oidc-token");
+  });
+
   it("returns local runtime status without requiring credentials", async () => {
     const app = createDaemonApp({
       startedAt: new Date("2026-06-21T00:00:00.000Z"),

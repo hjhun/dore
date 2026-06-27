@@ -298,4 +298,158 @@ describe("model routing", () => {
     expect(JSON.stringify(status)).not.toContain("sk-test-secret");
     expect(JSON.stringify(status)).not.toContain("gemini-secret");
   });
+
+  it("exposes OpenAI workload identity readiness without secret values", () => {
+    const registry = createProviderRegistry({
+      env: {
+        OPENAI_AUTH_MODE: "workload_identity",
+        OPENAI_WIF_SUBJECT_TOKEN: "external-oidc-token",
+        OPENAI_WIF_IDENTITY_PROVIDER_ID: "wip_123",
+        OPENAI_WIF_SERVICE_ACCOUNT_ID: "svc_123"
+      }
+    });
+
+    const status = registry.status();
+
+    expect(status).toContainEqual(
+      expect.objectContaining({
+        provider: "openai",
+        available: true,
+        auth_mode: "workload_identity"
+      })
+    );
+    expect(JSON.stringify(status)).not.toContain("external-oidc-token");
+  });
+
+  it("exchanges workload identity credentials before provider generation", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-model-gateway-"));
+    const calls: Array<{ authMode: string; apiKey?: string }> = [];
+    const client: ProviderClient = {
+      async generate(input) {
+        calls.push({
+          authMode: input.authMode,
+          apiKey: input.apiKey
+        });
+        return {
+          text: "hello from workload identity",
+          inputTokens: 7,
+          outputTokens: 4,
+          estimatedCostUsd: 0.01
+        };
+      }
+    };
+    try {
+      const gateway = createModelGateway({
+        memoryRoot,
+        env: {
+          OPENAI_AUTH_MODE: "workload_identity",
+          OPENAI_WIF_SUBJECT_TOKEN: "external-oidc-token",
+          OPENAI_WIF_IDENTITY_PROVIDER_ID: "wip_123",
+          OPENAI_WIF_SERVICE_ACCOUNT_ID: "svc_123"
+        },
+        clients: {
+          openai: client
+        },
+        workloadIdentityTokenExchanger: async (request) => {
+          expect(request).toMatchObject({
+            subjectToken: "external-oidc-token",
+            identityProviderId: "wip_123",
+            serviceAccountId: "svc_123"
+          });
+          return {
+            accessToken: "short-lived-openai-token",
+            expiresInSeconds: 3600
+          };
+        },
+        now: () => "2026-06-27T05:30:00.000Z"
+      });
+
+      const result = await gateway.generate({
+        task_id: "task_wif_001",
+        category: "assistant",
+        complexity: "medium",
+        latency_preference: "balanced",
+        cost_preference: "balanced",
+        context_size: "small",
+        requires_tools: false,
+        requires_json: false,
+        preferred_provider: "openai",
+        prompt: "Say hello."
+      });
+
+      expect(result).toMatchObject({
+        status: "success",
+        provider: "openai",
+        auth_mode: "workload_identity",
+        text: "hello from workload identity"
+      });
+      expect(calls).toEqual([
+        {
+          authMode: "workload_identity",
+          apiKey: "short-lived-openai-token"
+        }
+      ]);
+      const usageText = await readFile(join(memoryRoot, "logs", "usage", "2026-06.jsonl"), "utf8");
+      expect(usageText).toContain('"auth_mode":"workload_identity"');
+      expect(usageText).not.toContain("external-oidc-token");
+      expect(usageText).not.toContain("short-lived-openai-token");
+    } finally {
+      await rm(memoryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("records provider failure when workload identity token exchange fails", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-model-gateway-"));
+    try {
+      const gateway = createModelGateway({
+        memoryRoot,
+        env: {
+          OPENAI_AUTH_MODE: "workload_identity",
+          OPENAI_WIF_SUBJECT_TOKEN: "external-oidc-token",
+          OPENAI_WIF_IDENTITY_PROVIDER_ID: "wip_123",
+          OPENAI_WIF_SERVICE_ACCOUNT_ID: "svc_123"
+        },
+        clients: {
+          openai: {
+            async generate() {
+              throw new Error("should not call provider after failed exchange");
+            }
+          }
+        },
+        workloadIdentityTokenExchanger: async () => {
+          throw new Error("exchange failed");
+        },
+        now: () => "2026-06-27T05:31:00.000Z"
+      });
+
+      const result = await gateway.generate({
+        category: "assistant",
+        complexity: "medium",
+        latency_preference: "balanced",
+        cost_preference: "balanced",
+        context_size: "small",
+        requires_tools: false,
+        requires_json: false,
+        preferred_provider: "openai",
+        prompt: "Say hello."
+      });
+
+      expect(result).toMatchObject({
+        status: "failed",
+        provider: "openai",
+        auth_mode: "workload_identity",
+        error_code: "provider_error"
+      });
+      expect(await readUsageRecords(memoryRoot)).toContainEqual(
+        expect.objectContaining({
+          provider: "openai",
+          auth_mode: "workload_identity",
+          status: "failed",
+          error_code: "provider_error"
+        })
+      );
+    } finally {
+      await rm(memoryRoot, { recursive: true, force: true });
+    }
+  });
 });

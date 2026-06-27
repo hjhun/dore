@@ -8,8 +8,8 @@ Update it whenever development state changes.
 
 - Branch: `main`
 - Active plan: `docs/plan/ROADMAP.md`
-- Active milestone: M22, Agent Loop Reliability and Recovery Visibility
-- Current task: Compare against `../ref/hermes-agent`, add agent-loop reliability roadmap, and implement the first loop-status slice; M16/M17 broker work remains blocked by missing official inputs
+- Active milestone: OpenAI workload identity authentication hardening; M16 input collection remains blocked on Toss Securities API specs
+- Current task: Add official workload-identity-compatible OpenAI auth mode without reusing browser OAuth sessions; keep Toss Securities connector planning blocked until official API specs arrive
 
 ## Milestone Progress
 
@@ -183,6 +183,7 @@ Update it whenever development state changes.
 - [x] M22 repeated failure/no-progress guardrail summaries implemented.
 - [x] M22 abnormal-stop finalizer summaries implemented.
 - [x] M22 background review trigger records implemented.
+- [x] OpenAI workload identity auth mode implemented for config, provider status, daemon health, and model gateway token exchange.
 
 ## M0 Checklist
 
@@ -504,6 +505,24 @@ Update it whenever development state changes.
 
 ## Verification Log
 
+- 2026-06-27: Tester started verification for Toss Securities M16 input-collection documentation update.
+- 2026-06-27: `git diff --check` passed after Toss Securities M16 input-collection documentation update.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test` passed after Toss Securities M16 input-collection documentation update, 17 files and 172 tests.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build` passed after Toss Securities M16 input-collection documentation update.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build:desktop` passed after Toss Securities M16 input-collection documentation update.
+- 2026-06-27: `npx --yes pnpm@11.8.0 doctor` passed after Toss Securities M16 input-collection documentation update; provider and Telegram credential warnings remain expected until env vars are configured.
+- 2026-06-27: `npx --yes pnpm@11.8.0 trading:m16-check configs/m16-broker-input.example.json` returned expected `blocked` result for incomplete M16 inputs.
+- 2026-06-27: OpenAI workload identity auth TDD red phase confirmed for missing config provider schema, missing provider WIF status, missing daemon health/status support, and unhandled token exchange failure.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test -- packages/config/src/config.test.ts packages/model-gateway/src/routing.test.ts packages/contracts/src/contracts.test.ts apps/daemon/src/status.test.ts` passed after OpenAI workload identity auth implementation, 17 files and 178 tests.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test -- packages/model-gateway/src/routing.test.ts` passed after workload identity token-exchange failure handling, 17 files and 179 tests.
+- 2026-06-27: `git diff --check` passed after OpenAI workload identity auth implementation.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test` passed after OpenAI workload identity auth implementation, 17 files and 179 tests.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build` passed after OpenAI workload identity auth implementation.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build:desktop` passed after OpenAI workload identity auth implementation.
+- 2026-06-27: `npx --yes pnpm@11.8.0 doctor` passed after OpenAI workload identity auth implementation; default API-key-mode credential warnings remain expected until env vars are configured.
+- 2026-06-27: `OPENAI_AUTH_MODE=workload_identity ... npx --yes pnpm@11.8.0 doctor` passed with `openai.credentials: ok (workload identity env)` using fixture env names and no token value output.
+- 2026-06-27: WIF-mode daemon smoke test passed on port 3199; `/status.providers.openai.auth_mode` returned `workload_identity`, provider configured true, and real trading remained disabled.
+- 2026-06-27: Final OpenAI auth contract verification passed after removing stale `oauth` usage-record auth mode: `git diff --check`, `npx --yes pnpm@11.8.0 test`, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, and `npx --yes pnpm@11.8.0 doctor`.
 - 2026-06-21: Docs relative link check passed before plan work.
 - 2026-06-21: TDD red phase confirmed with 6 failing suites for missing implementation files.
 - 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 6 files and 13 tests.
@@ -888,15 +907,16 @@ Update it whenever development state changes.
 
 - `gh` CLI is not installed in the current environment, so automatic PR creation is unavailable.
 - WSL does not have a global `pnpm` binary. Verification used `npx --yes pnpm@11.8.0 ...`.
-- Broker credentials and detailed securities API information will be supplied later by the user.
+- Broker target is Toss Securities; official API specs, terms, and detailed securities API information will be supplied later by the user.
+- OpenAI API auth supports API key mode and official workload identity federation mode; browser OAuth or ChatGPT/Codex login sessions are not reused as Dore API credentials.
 - Real trading remains disabled.
 - M0-M15 are local MVP complete; M16-M17 are post-MVP broker/real-trading work.
-- M16 cannot begin safely without official broker/API documentation, API terms, account permission constraints, credential references, desired pilot risk limits, and explicit approval policy.
+- M16 cannot begin safely beyond input collection without official Toss Securities API documentation, API terms, account permission constraints, credential references, desired pilot risk limits, and explicit approval policy.
 - M16 input collection should use `docs/plan/M16_BROKER_CONNECTOR_INPUT_PACKET.md`.
 - M16 input readiness can be evaluated with `assessBrokerConnectorInputPacket` in `packages/trading`.
 - M16 input packet files can be checked with `npx --yes pnpm@11.8.0 trading:m16-check <packet.json>`.
-- M18-M21 local hardening is complete without broker/API inputs; M22 agent-loop reliability is in progress; real trading stays blocked.
+- M18-M21 local hardening and M22 agent-loop reliability are complete without broker/API inputs; real trading stays blocked.
 
 ## Next Action
 
-M22 local agent-loop reliability is complete. Keep M16 blocked until the user supplies completed broker/API inputs.
+OpenAI workload identity auth support is implemented and verified. To use it with real OpenAI API calls, supply official WIF environment values or continue with API-key mode. Continue M16 input collection for Toss Securities, but keep connector planning and implementation blocked until the user supplies completed official API inputs.

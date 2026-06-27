@@ -75,7 +75,7 @@ export const LlmUsageRecordSchema = z.object({
   task_id: z.string().min(1).optional(),
   provider: z.enum(["openai", "claude", "gemini"]),
   model: z.string().min(1),
-  auth_mode: z.enum(["api_key", "oauth"]),
+  auth_mode: z.enum(["api_key", "workload_identity"]),
   category: z.enum(["assistant", "engineering", "review", "briefing", "trading_report", "background"]),
   started_at: z.string().min(1),
   ended_at: z.string().min(1),

@@ -36,7 +36,7 @@ export function evaluateDaemonHealth(input: EvaluateDaemonHealthInput): HealthRe
       path: "configs/dore.config.example.yaml",
       projectRoot: input.projectRoot
     }),
-    optionalEnvCheck("openai.credentials", "OpenAI credentials", "OPENAI_API_KEY", input.env),
+    openAiCredentialCheck(input.env),
     optionalEnvCheck("claude.credentials", "Claude credentials", "ANTHROPIC_API_KEY", input.env),
     optionalEnvCheck("gemini.credentials", "Gemini credentials", "GEMINI_API_KEY", input.env),
     optionalEnvCheck("telegram.credentials", "Telegram bot token", "TELEGRAM_BOT_TOKEN", input.env),
@@ -89,4 +89,22 @@ function optionalEnvCheck(
     severity: "optional",
     detail: `${envName} env`
   };
+}
+
+function openAiCredentialCheck(env: Record<string, string | undefined>): HealthCheck {
+  if (env.OPENAI_AUTH_MODE === "workload_identity") {
+    const hasWorkloadIdentity =
+      Boolean(env.OPENAI_WIF_ACCESS_TOKEN) ||
+      (Boolean(env.OPENAI_WIF_SUBJECT_TOKEN) &&
+        Boolean(env.OPENAI_WIF_IDENTITY_PROVIDER_ID) &&
+        Boolean(env.OPENAI_WIF_SERVICE_ACCOUNT_ID));
+    return {
+      id: "openai.credentials",
+      label: "OpenAI credentials",
+      status: hasWorkloadIdentity ? "ok" : "warning",
+      severity: "optional",
+      detail: "workload identity env"
+    };
+  }
+  return optionalEnvCheck("openai.credentials", "OpenAI credentials", "OPENAI_API_KEY", env);
 }

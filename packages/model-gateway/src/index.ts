@@ -16,7 +16,7 @@ export interface ModelSelection {
 }
 
 type Provider = ModelSelection["selected_provider"];
-type AuthMode = "api_key" | "oauth";
+type AuthMode = "api_key" | "workload_identity";
 type UsageStatus = "success" | "failed" | "cancelled";
 
 const DEFAULT_PROVIDER: Provider = "openai";
@@ -80,12 +80,29 @@ export interface ProviderStatus {
   reason?: "missing_credentials" | "client_not_configured";
 }
 
+export interface WorkloadIdentityCredential {
+  subjectToken: string;
+  identityProviderId: string;
+  serviceAccountId: string;
+  tokenUrl: string;
+}
+
+export interface WorkloadIdentityTokenExchangeOutput {
+  accessToken: string;
+  expiresInSeconds: number;
+}
+
+export type WorkloadIdentityTokenExchanger = (
+  input: WorkloadIdentityCredential
+) => Promise<WorkloadIdentityTokenExchangeOutput>;
+
 export interface ProviderRegistry {
   status(): ProviderStatus[];
   get(provider: Provider): {
     provider: Provider;
     authMode: AuthMode;
     apiKey?: string;
+    workloadIdentity?: WorkloadIdentityCredential;
     client?: ProviderClient;
   };
 }
@@ -121,21 +138,26 @@ export function createProviderRegistry(input: {
   return {
     status(): ProviderStatus[] {
       return (["openai", "claude", "gemini"] as Provider[]).map((provider) => {
+        const authMode = authModeForProvider(provider, env);
         const key = credentialForProvider(provider, env);
+        const workloadIdentity = workloadIdentityForProvider(provider, env);
+        const available = authMode === "workload_identity" ? Boolean(key || workloadIdentity) : Boolean(key);
         return {
           provider,
-          available: Boolean(key),
-          auth_mode: "api_key",
+          available,
+          auth_mode: authMode,
           configured_model: MODELS[provider].standard,
-          reason: key ? undefined : "missing_credentials"
+          reason: available ? undefined : "missing_credentials"
         };
       });
     },
     get(provider: Provider) {
+      const authMode = authModeForProvider(provider, env);
       return {
         provider,
-        authMode: "api_key",
+        authMode,
         apiKey: credentialForProvider(provider, env),
+        workloadIdentity: workloadIdentityForProvider(provider, env),
         client: clients[provider]
       };
     }
@@ -175,9 +197,11 @@ export function createModelGateway(input: {
   clients?: Partial<Record<Provider, ProviderClient>>;
   registry?: ProviderRegistry;
   budgetGuard?: BudgetGuard;
+  workloadIdentityTokenExchanger?: WorkloadIdentityTokenExchanger;
   now?: () => string;
 }) {
   const registry = input.registry ?? createProviderRegistry({ env: input.env, clients: input.clients });
+  const workloadIdentityTokenExchanger = input.workloadIdentityTokenExchanger ?? exchangeWorkloadIdentityToken;
   const now = input.now ?? (() => new Date().toISOString());
   return {
     async generate(request: ModelGatewayGenerateInput): Promise<ModelGatewayGenerateResult> {
@@ -217,7 +241,40 @@ export function createModelGateway(input: {
           cost_guard: {}
         };
       }
-      if (!provider.apiKey) {
+      let resolvedCredential = provider.apiKey;
+      try {
+        if (provider.authMode === "workload_identity" && !resolvedCredential && provider.workloadIdentity) {
+          resolvedCredential = (await workloadIdentityTokenExchanger(provider.workloadIdentity)).accessToken;
+        }
+      } catch {
+        const usage = await appendUsageRecord(input.memoryRoot, {
+          id: createUsageId(startedAt, selection.selected_provider),
+          task_id: request.task_id,
+          provider: selection.selected_provider,
+          model: selection.selected_model,
+          auth_mode: authMode,
+          category: request.category,
+          started_at: startedAt,
+          ended_at: now(),
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_tokens: 0,
+          estimated_cost_usd: 0,
+          latency_ms: elapsedMs(startedTime, Date.parse(now())),
+          status: "failed",
+          error_code: "provider_error"
+        });
+        return {
+          status: "failed",
+          provider: selection.selected_provider,
+          model: selection.selected_model,
+          auth_mode: authMode,
+          usage,
+          error_code: "provider_error"
+        };
+      }
+
+      if (!resolvedCredential) {
         const usage = await appendUsageRecord(input.memoryRoot, {
           id: createUsageId(startedAt, selection.selected_provider),
           task_id: request.task_id,
@@ -277,7 +334,7 @@ export function createModelGateway(input: {
           prompt: request.prompt,
           model: selection.selected_model,
           authMode,
-          apiKey: provider.apiKey
+          apiKey: resolvedCredential
         });
         const endedAt = now();
         const usage = await appendUsageRecord(input.memoryRoot, {
@@ -378,13 +435,76 @@ async function appendUsageRecord(memoryRoot: string, record: LlmUsageRecord): Pr
 }
 
 function credentialForProvider(provider: Provider, env: Partial<NodeJS.ProcessEnv>): string | undefined {
+  if (provider === "openai" && authModeForProvider(provider, env) === "workload_identity") {
+    return nonEmpty(env.OPENAI_WIF_ACCESS_TOKEN);
+  }
   const envName: Record<Provider, string> = {
     openai: "OPENAI_API_KEY",
     claude: "ANTHROPIC_API_KEY",
     gemini: "GEMINI_API_KEY"
   };
-  const value = env[envName[provider]];
+  return nonEmpty(env[envName[provider]]);
+}
+
+function authModeForProvider(provider: Provider, env: Partial<NodeJS.ProcessEnv>): AuthMode {
+  if (provider === "openai" && env.OPENAI_AUTH_MODE === "workload_identity") {
+    return "workload_identity";
+  }
+  return "api_key";
+}
+
+function workloadIdentityForProvider(
+  provider: Provider,
+  env: Partial<NodeJS.ProcessEnv>
+): WorkloadIdentityCredential | undefined {
+  if (provider !== "openai" || authModeForProvider(provider, env) !== "workload_identity") {
+    return undefined;
+  }
+  const subjectToken = nonEmpty(env.OPENAI_WIF_SUBJECT_TOKEN);
+  const identityProviderId = nonEmpty(env.OPENAI_WIF_IDENTITY_PROVIDER_ID);
+  const serviceAccountId = nonEmpty(env.OPENAI_WIF_SERVICE_ACCOUNT_ID);
+  if (!subjectToken || !identityProviderId || !serviceAccountId) {
+    return undefined;
+  }
+  return {
+    subjectToken,
+    identityProviderId,
+    serviceAccountId,
+    tokenUrl: nonEmpty(env.OPENAI_WIF_TOKEN_URL) ?? "https://auth.openai.com/oauth/token"
+  };
+}
+
+function nonEmpty(value: string | undefined): string | undefined {
   return value && value.trim().length > 0 ? value : undefined;
+}
+
+async function exchangeWorkloadIdentityToken(
+  input: WorkloadIdentityCredential
+): Promise<WorkloadIdentityTokenExchangeOutput> {
+  const response = await fetch(input.tokenUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+      subject_token: input.subjectToken,
+      identity_provider_id: input.identityProviderId,
+      service_account_id: input.serviceAccountId
+    })
+  });
+  if (!response.ok) {
+    throw new Error("workload identity token exchange failed");
+  }
+  const payload = (await response.json()) as { access_token?: string; expires_in?: number };
+  if (!payload.access_token) {
+    throw new Error("workload identity token exchange returned no access token");
+  }
+  return {
+    accessToken: payload.access_token,
+    expiresInSeconds: payload.expires_in ?? 0
+  };
 }
 
 function createUsageId(now: string, provider: Provider): string {

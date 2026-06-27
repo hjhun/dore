@@ -41,9 +41,11 @@ llm:
       enabled: true
       auth_mode: api_key
       api_key_env: OPENAI_API_KEY
-      oauth:
-        enabled: true
-        token_store: os_keychain
+      workload_identity:
+        subject_token_env: OPENAI_WIF_SUBJECT_TOKEN
+        identity_provider_id_env: OPENAI_WIF_IDENTITY_PROVIDER_ID
+        service_account_id_env: OPENAI_WIF_SERVICE_ACCOUNT_ID
+        token_url: https://auth.openai.com/oauth/token
       default_model: gpt-5.4
       task_models:
         high_reasoning: gpt-5.5
@@ -162,6 +164,12 @@ trading:
 허용:
 
 - `OPENAI_API_KEY`.
+- `OPENAI_AUTH_MODE=workload_identity` can switch OpenAI provider readiness
+  checks to official workload identity federation inputs.
+- `OPENAI_WIF_SUBJECT_TOKEN`, `OPENAI_WIF_IDENTITY_PROVIDER_ID`, and
+  `OPENAI_WIF_SERVICE_ACCOUNT_ID` are used only for official OpenAI workload
+  identity federation token exchange. Browser OAuth sessions are not treated as
+  OpenAI API credentials.
 - `ANTHROPIC_API_KEY`.
 - `GEMINI_API_KEY`.
 - `TELEGRAM_BOT_TOKEN`.

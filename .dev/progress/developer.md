@@ -3,7 +3,7 @@
 ## Status
 
 - State: complete
-- Last updated: 2026-06-23 00:05 KST
+- Last updated: 2026-06-27 14:34 KST
 
 ## Inputs Reviewed
 
@@ -31,6 +31,13 @@
 - `docs/drafts/26_ACCEPTANCE_CRITERIA.md`
 - `docs/drafts/09_HERMES_COMPATIBILITY.md`
 - `docs/drafts/04_TOOLS_AND_DATA.md`
+- `packages/config/src/index.ts`
+- `packages/config/src/config.test.ts`
+- `packages/model-gateway/src/index.ts`
+- `packages/model-gateway/src/routing.test.ts`
+- `apps/daemon/src/health.ts`
+- `apps/daemon/src/status.test.ts`
+- Official OpenAI docs for API key auth, Codex auth, and workload identity federation
 
 ## Current Work
 
@@ -58,7 +65,16 @@
 - Completed M21 code-review report storage and desktop visibility slice.
 - Completed M21 workflow risk review visibility slice.
 - Completed M21 engineering memory-reflection improvements.
-- Next implementation slice: none defined for local hardening after M21; M16/M17 remain blocked on broker/API inputs.
+- Current implementation slice: OpenAI workload identity authentication support for Dore.
+- M16/M17 remain blocked on broker/API inputs.
+
+## 2026-06-27 OpenAI Workload Identity Auth Slice
+
+- Added TDD coverage for OpenAI workload identity config, provider status, daemon health, usage records, token exchange, and token-exchange failure handling.
+- Implemented `llm.providers.openai.auth_mode: workload_identity` config parsing with env-name based WIF inputs.
+- Added model-gateway support for `OPENAI_AUTH_MODE=workload_identity`, official token exchange against `https://auth.openai.com/oauth/token`, and secret-safe usage records.
+- Added daemon health/status visibility for workload identity readiness without exposing subject tokens or access tokens.
+- Updated config example and LLM/runtime draft docs to replace the old browser-OAuth assumption with official API key and workload identity modes.
 
 ## Tests And Verification
 
@@ -118,6 +134,21 @@
   - `npx --yes pnpm@11.8.0 build`
   - `npx --yes pnpm@11.8.0 build:desktop`
 - M15 documentation gate completed:
+- OpenAI workload identity red phase: targeted tests failed for missing config provider schema, missing provider WIF status, missing daemon health/status support, and unhandled token exchange failure.
+- OpenAI workload identity green phase:
+  - `npx --yes pnpm@11.8.0 test -- packages/config/src/config.test.ts packages/model-gateway/src/routing.test.ts apps/daemon/src/status.test.ts` passed, 17 files and 177 tests.
+  - `npx --yes pnpm@11.8.0 test -- packages/config/src/config.test.ts packages/model-gateway/src/routing.test.ts packages/contracts/src/contracts.test.ts apps/daemon/src/status.test.ts` passed, 17 files and 178 tests.
+  - `npx --yes pnpm@11.8.0 test -- packages/model-gateway/src/routing.test.ts` passed after token-exchange failure handling, 17 files and 179 tests.
+- OpenAI workload identity broader verification:
+  - `git diff --check` passed.
+  - `npx --yes pnpm@11.8.0 test` passed, 17 files and 179 tests.
+  - `npx --yes pnpm@11.8.0 build` passed.
+  - `npx --yes pnpm@11.8.0 build:desktop` passed.
+  - `npx --yes pnpm@11.8.0 doctor` passed with expected default API-key-mode OpenAI credential warning.
+  - `OPENAI_AUTH_MODE=workload_identity ... npx --yes pnpm@11.8.0 doctor` passed with OpenAI workload identity readiness OK and no token value output.
+  - WIF-mode daemon smoke on port 3199 passed; `/status` returned OpenAI `auth_mode: workload_identity`, configured true, and `trading.real_trading_enabled: false`.
+  - Final auth contract cleanup removed stale `oauth` usage-record auth mode.
+  - Final verification passed: `git diff --check`, `npx --yes pnpm@11.8.0 test`, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, and `npx --yes pnpm@11.8.0 doctor`.
   - `docs/plan/MILESTONE_15_MVP_ACCEPTANCE_AUDIT.md`
   - `docs/plan/EVAL_RUNBOOK.md`
   - `docs/plan/HERMES_MVP_PARITY.md`
@@ -317,6 +348,7 @@
 - Keep M19 persistence changes focused on runtime core state first; broader package-specific write paths can be hardened in later slices if needed.
 - Keep M20 memory quality primitives Markdown/frontmatter-based until daemon or desktop surfaces require a broader index.
 - Keep M21 memory reflection Markdown/frontmatter-based and use the existing `engineering` memory record type for follow-up tasks.
+- Do not reuse browser OAuth, ChatGPT, or Codex login sessions as Dore OpenAI API credentials; use official API key mode or official workload identity federation mode.
 
 ## Blockers
 

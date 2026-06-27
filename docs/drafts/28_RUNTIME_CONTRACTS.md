@@ -130,7 +130,7 @@ id: usage_20260621_000001
 task_id: optional task id
 provider: openai | claude | gemini
 model: string
-auth_mode: api_key | oauth
+auth_mode: api_key | workload_identity
 category: assistant | engineering | review | briefing | trading_report | background
 started_at: ISO-8601
 ended_at: ISO-8601
@@ -305,4 +305,3 @@ Electron, Telegram, CLI는 daemon API를 통해 같은 상태를 읽는다.
 - `GET /memory/index`
 
 초기 구현은 HTTP localhost API, Unix/Windows local socket, 또는 IPC 중 하나를 선택할 수 있다. Electron 연동을 고려하면 MVP에서는 localhost HTTP API와 token-based local auth가 가장 단순하다.
-

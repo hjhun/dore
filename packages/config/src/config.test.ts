@@ -85,4 +85,24 @@ describe("config schema", () => {
       })
     ).toThrow("Broker credential values must be secret_ref references.");
   });
+
+  it("accepts OpenAI workload identity auth configuration without raw tokens", () => {
+    const config = parseConfig({
+      llm: {
+        providers: {
+          openai: {
+            auth_mode: "workload_identity",
+            workload_identity: {
+              subject_token_env: "OPENAI_WIF_SUBJECT_TOKEN",
+              identity_provider_id_env: "OPENAI_WIF_IDENTITY_PROVIDER_ID",
+              service_account_id_env: "OPENAI_WIF_SERVICE_ACCOUNT_ID"
+            }
+          }
+        }
+      }
+    });
+
+    expect(config.llm.providers.openai.auth_mode).toBe("workload_identity");
+    expect(config.llm.providers.openai.workload_identity.subject_token_env).toBe("OPENAI_WIF_SUBJECT_TOKEN");
+  });
 });
