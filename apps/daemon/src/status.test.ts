@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -108,6 +108,42 @@ describe("daemon status", () => {
     expect(lines.join("\n")).not.toContain("external-oidc-token");
   });
 
+  it("reports OpenAI OAuth health from local auth metadata without exposing tokens", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-oauth-auth-"));
+    const authFile = join(memoryRoot, "auth.json");
+    await writeFile(
+      authFile,
+      JSON.stringify({
+        tokens: {
+          access_token: "oauth-access-token",
+          refresh_token: "oauth-refresh-token"
+        }
+      })
+    );
+    const lines: string[] = [];
+    try {
+      const result = await runDoctor({
+        env: {
+          OPENAI_AUTH_MODE: "oauth",
+          OPENAI_OAUTH_CODEX_AUTH_FILE: authFile
+        },
+        stdout: (line) => lines.push(line)
+      });
+
+      expect(result.report.checks).toContainEqual(
+        expect.objectContaining({
+          id: "openai.credentials",
+          status: "ok",
+          detail: "oauth codex auth json"
+        })
+      );
+      expect(lines.join("\n")).not.toContain("oauth-access-token");
+      expect(lines.join("\n")).not.toContain("oauth-refresh-token");
+    } finally {
+      await rm(memoryRoot, { recursive: true, force: true });
+    }
+  });
+
   it("exposes OpenAI workload identity provider status through daemon status", async () => {
     const app = createDaemonApp({
       env: {
@@ -131,6 +167,45 @@ describe("daemon status", () => {
       model: "gpt-5.4"
     });
     expect(JSON.stringify(body)).not.toContain("external-oidc-token");
+  });
+
+  it("exposes OpenAI OAuth provider status through daemon status", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-oauth-auth-"));
+    const authFile = join(memoryRoot, "auth.json");
+    await writeFile(
+      authFile,
+      JSON.stringify({
+        tokens: {
+          access_token: "oauth-access-token",
+          refresh_token: "oauth-refresh-token"
+        }
+      })
+    );
+    try {
+      const app = createDaemonApp({
+        env: {
+          OPENAI_AUTH_MODE: "oauth",
+          OPENAI_OAUTH_CODEX_AUTH_FILE: authFile
+        }
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/status"
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.providers.openai).toMatchObject({
+        configured: true,
+        auth_mode: "oauth",
+        model: "gpt-5.4"
+      });
+      expect(JSON.stringify(body)).not.toContain("oauth-access-token");
+      expect(JSON.stringify(body)).not.toContain("oauth-refresh-token");
+    } finally {
+      await rm(memoryRoot, { recursive: true, force: true });
+    }
   });
 
   it("returns local runtime status without requiring credentials", async () => {

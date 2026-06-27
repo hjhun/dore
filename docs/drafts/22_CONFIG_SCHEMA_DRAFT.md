@@ -41,6 +41,10 @@ llm:
       enabled: true
       auth_mode: api_key
       api_key_env: OPENAI_API_KEY
+      oauth:
+        token_source: codex_auth_json
+        access_token_env: OPENAI_OAUTH_ACCESS_TOKEN
+        codex_auth_file_env: OPENAI_OAUTH_CODEX_AUTH_FILE
       workload_identity:
         subject_token_env: OPENAI_WIF_SUBJECT_TOKEN
         identity_provider_id_env: OPENAI_WIF_IDENTITY_PROVIDER_ID
@@ -164,12 +168,20 @@ trading:
 허용:
 
 - `OPENAI_API_KEY`.
+- `OPENAI_AUTH_MODE=oauth` can switch OpenAI provider readiness checks to a
+  direct OAuth bearer-token path. Dore calls OpenAI directly; it does not call
+  Codex CLI.
+- `OPENAI_OAUTH_ACCESS_TOKEN` can provide the bearer token through the
+  environment. The token value itself must not be written to config, docs, logs,
+  or UI.
+- `OPENAI_OAUTH_CODEX_AUTH_FILE` can point at local OAuth metadata such as
+  `${CODEX_HOME:-$HOME/.codex}/auth.json`; only the access token is read and the
+  token value is never surfaced.
 - `OPENAI_AUTH_MODE=workload_identity` can switch OpenAI provider readiness
   checks to official workload identity federation inputs.
 - `OPENAI_WIF_SUBJECT_TOKEN`, `OPENAI_WIF_IDENTITY_PROVIDER_ID`, and
   `OPENAI_WIF_SERVICE_ACCOUNT_ID` are used only for official OpenAI workload
-  identity federation token exchange. Browser OAuth sessions are not treated as
-  OpenAI API credentials.
+  identity federation token exchange.
 - `ANTHROPIC_API_KEY`.
 - `GEMINI_API_KEY`.
 - `TELEGRAM_BOT_TOKEN`.

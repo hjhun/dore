@@ -348,7 +348,9 @@
 - Keep M19 persistence changes focused on runtime core state first; broader package-specific write paths can be hardened in later slices if needed.
 - Keep M20 memory quality primitives Markdown/frontmatter-based until daemon or desktop surfaces require a broader index.
 - Keep M21 memory reflection Markdown/frontmatter-based and use the existing `engineering` memory record type for follow-up tasks.
-- Do not reuse browser OAuth, ChatGPT, or Codex login sessions as Dore OpenAI API credentials; use official API key mode or official workload identity federation mode.
+- Support direct OpenAI OAuth only when explicitly selected. Dore may read local
+  OAuth metadata or an env bearer token, but must call OpenAI directly and must
+  not call Codex CLI.
 
 ## Blockers
 
@@ -390,3 +392,24 @@
 - Green phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed, 17 files and 172 tests.
 - Decision: keep background review as an auditable trigger record; actual background worker execution can remain a later runtime concern.
 - Remaining M22 work: none in the current roadmap checklist.
+
+## 2026-06-27 OpenAI Direct OAuth
+
+- State: complete
+- Current work: added direct OpenAI `oauth` auth mode without Codex CLI integration.
+- Red phase: targeted tests failed for missing `oauth` config schema, usage
+  contract auth mode, provider OAuth readiness, daemon health/status support,
+  and insufficient-scope classification.
+- Green phase: `npx --yes pnpm@11.8.0 test packages/config/src/config.test.ts packages/contracts/src/contracts.test.ts packages/model-gateway/src/routing.test.ts apps/daemon/src/status.test.ts` passed, 48 tests.
+- Full verification passed:
+  - `git diff --check`
+  - `npx --yes pnpm@11.8.0 test`, 17 files and 186 tests
+  - `npx --yes pnpm@11.8.0 build`
+  - `npx --yes pnpm@11.8.0 build:desktop`
+  - `npx --yes pnpm@11.8.0 doctor`
+  - `OPENAI_AUTH_MODE=oauth npx --yes pnpm@11.8.0 doctor`
+- Manual OAuth smoke: local OAuth metadata was present, but a direct Responses
+  API call returned HTTP 401 for missing `api.responses.write` scope. This
+  matches the new `insufficient_scope` failure path.
+- Decision: keep local OAuth metadata as a credential source only. Provider
+  calls remain inside Dore model gateway; no Codex CLI process is invoked.

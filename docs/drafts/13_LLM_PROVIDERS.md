@@ -65,15 +65,24 @@ OpenAI는 API key 외에 OAuth 계열 연결 방식을 지원한다.
 요구사항:
 
 - OpenAI provider는 일반 API 호출에 `api_key`를 기본으로 사용한다.
+- 사용자가 명시적으로 선택하면 Dore가 `oauth` auth mode로 OpenAI API에
+  직접 bearer token을 전달할 수 있다.
+- `oauth` mode는 Codex CLI를 호출하지 않는다. 로컬 OAuth metadata는
+  access token source로만 읽고, provider 호출은 Dore model gateway가
+  직접 수행한다.
+- 로컬 Codex auth metadata를 사용할 때 기본 파일은
+  `${CODEX_HOME:-$HOME/.codex}/auth.json`이며, 테스트와 운영 override는
+  `OPENAI_OAUTH_CODEX_AUTH_FILE`을 사용한다.
+- `OPENAI_OAUTH_ACCESS_TOKEN`이 있으면 local auth metadata보다 우선한다.
 - 장기 비밀 키를 피해야 하는 신뢰된 workload에서는 공식 OpenAI workload
   identity federation을 통해 `workload_identity` auth mode를 사용할 수 있다.
-- 브라우저 OAuth 또는 ChatGPT/Codex 로그인 세션은 Dore의 OpenAI API
-  credential로 재사용하지 않는다.
 - 기본값은 `api_key`다.
 - OAuth 연결은 사용자가 명시적으로 선택했을 때만 수행한다.
 - OAuth token은 안전한 credential store에 저장한다.
 - token refresh, 만료, revoke 상태를 처리한다.
 - OAuth로 사용할 수 있는 기능 범위는 구현 시점의 OpenAI 공식 문서를 기준으로 검증한다.
+- OAuth token에 `api.responses.write` 같은 API scope가 없으면 provider
+  failure는 `insufficient_scope`로 기록한다.
 
 주의:
 
@@ -92,6 +101,10 @@ llm:
       enabled: true
       auth_mode: api_key
       api_key_env: OPENAI_API_KEY
+      oauth:
+        token_source: codex_auth_json
+        access_token_env: OPENAI_OAUTH_ACCESS_TOKEN
+        codex_auth_file_env: OPENAI_OAUTH_CODEX_AUTH_FILE
       workload_identity:
         subject_token_env: OPENAI_WIF_SUBJECT_TOKEN
         identity_provider_id_env: OPENAI_WIF_IDENTITY_PROVIDER_ID

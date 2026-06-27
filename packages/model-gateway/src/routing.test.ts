@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -321,6 +321,44 @@ describe("model routing", () => {
     expect(JSON.stringify(status)).not.toContain("external-oidc-token");
   });
 
+  it("exposes OpenAI OAuth readiness from local auth metadata without secret values", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-oauth-auth-"));
+    const authFile = join(memoryRoot, "auth.json");
+    await writeFile(
+      authFile,
+      JSON.stringify({
+        tokens: {
+          access_token: "oauth-access-token",
+          refresh_token: "oauth-refresh-token"
+        },
+        last_refresh: "2026-06-27T06:00:00.000Z"
+      })
+    );
+    try {
+      const registry = createProviderRegistry({
+        env: {
+          OPENAI_AUTH_MODE: "oauth",
+          OPENAI_OAUTH_CODEX_AUTH_FILE: authFile
+        }
+      });
+
+      const status = registry.status();
+
+      expect(status).toContainEqual(
+        expect.objectContaining({
+          provider: "openai",
+          available: true,
+          auth_mode: "oauth",
+          credential_source: "codex_auth_json"
+        })
+      );
+      expect(JSON.stringify(status)).not.toContain("oauth-access-token");
+      expect(JSON.stringify(status)).not.toContain("oauth-refresh-token");
+    } finally {
+      await rm(memoryRoot, { recursive: true, force: true });
+    }
+  });
+
   it("exchanges workload identity credentials before provider generation", async () => {
     const memoryRoot = await mkdtemp(join(tmpdir(), "dore-model-gateway-"));
     const calls: Array<{ authMode: string; apiKey?: string }> = [];
@@ -446,6 +484,139 @@ describe("model routing", () => {
           auth_mode: "workload_identity",
           status: "failed",
           error_code: "provider_error"
+        })
+      );
+    } finally {
+      await rm(memoryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("uses OpenAI OAuth credentials directly for provider generation", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-model-gateway-"));
+    const authFile = join(memoryRoot, "auth.json");
+    await writeFile(
+      authFile,
+      JSON.stringify({
+        tokens: {
+          access_token: "oauth-access-token",
+          refresh_token: "oauth-refresh-token"
+        }
+      })
+    );
+    const calls: Array<{ authMode: string; apiKey?: string }> = [];
+    const client: ProviderClient = {
+      async generate(input) {
+        calls.push({
+          authMode: input.authMode,
+          apiKey: input.apiKey
+        });
+        return {
+          text: "hello from oauth",
+          inputTokens: 7,
+          outputTokens: 4,
+          estimatedCostUsd: 0.01
+        };
+      }
+    };
+    try {
+      const gateway = createModelGateway({
+        memoryRoot,
+        env: {
+          OPENAI_AUTH_MODE: "oauth",
+          OPENAI_OAUTH_CODEX_AUTH_FILE: authFile
+        },
+        clients: {
+          openai: client
+        },
+        now: () => "2026-06-27T06:00:00.000Z"
+      });
+
+      const result = await gateway.generate({
+        task_id: "task_oauth_001",
+        category: "assistant",
+        complexity: "medium",
+        latency_preference: "balanced",
+        cost_preference: "balanced",
+        context_size: "small",
+        requires_tools: false,
+        requires_json: false,
+        preferred_provider: "openai",
+        prompt: "Say hello."
+      });
+
+      expect(result).toMatchObject({
+        status: "success",
+        provider: "openai",
+        auth_mode: "oauth",
+        text: "hello from oauth"
+      });
+      expect(calls).toEqual([
+        {
+          authMode: "oauth",
+          apiKey: "oauth-access-token"
+        }
+      ]);
+      const usageText = await readFile(join(memoryRoot, "logs", "usage", "2026-06.jsonl"), "utf8");
+      expect(usageText).toContain('"auth_mode":"oauth"');
+      expect(usageText).not.toContain("oauth-access-token");
+      expect(usageText).not.toContain("oauth-refresh-token");
+    } finally {
+      await rm(memoryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("classifies OpenAI OAuth missing scope failures", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-model-gateway-"));
+    const authFile = join(memoryRoot, "auth.json");
+    await writeFile(
+      authFile,
+      JSON.stringify({
+        tokens: {
+          access_token: "oauth-access-token"
+        }
+      })
+    );
+    try {
+      const gateway = createModelGateway({
+        memoryRoot,
+        env: {
+          OPENAI_AUTH_MODE: "oauth",
+          OPENAI_OAUTH_CODEX_AUTH_FILE: authFile
+        },
+        clients: {
+          openai: {
+            async generate() {
+              throw new Error("Missing scopes: api.responses.write");
+            }
+          }
+        },
+        now: () => "2026-06-27T06:01:00.000Z"
+      });
+
+      const result = await gateway.generate({
+        category: "assistant",
+        complexity: "medium",
+        latency_preference: "balanced",
+        cost_preference: "balanced",
+        context_size: "small",
+        requires_tools: false,
+        requires_json: false,
+        preferred_provider: "openai",
+        prompt: "Say hello."
+      });
+
+      expect(result).toMatchObject({
+        status: "failed",
+        provider: "openai",
+        auth_mode: "oauth",
+        error_code: "insufficient_scope"
+      });
+      expect(await readUsageRecords(memoryRoot)).toContainEqual(
+        expect.objectContaining({
+          provider: "openai",
+          auth_mode: "oauth",
+          status: "failed",
+          error_code: "insufficient_scope"
         })
       );
     } finally {

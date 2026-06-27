@@ -8,8 +8,8 @@ Update it whenever development state changes.
 
 - Branch: `main`
 - Active plan: `docs/plan/ROADMAP.md`
-- Active milestone: OpenAI workload identity authentication hardening; M16 input collection remains blocked on Toss Securities API specs
-- Current task: Add official workload-identity-compatible OpenAI auth mode without reusing browser OAuth sessions; keep Toss Securities connector planning blocked until official API specs arrive
+- Active milestone: OpenAI direct OAuth authentication hardening; M16 input collection remains blocked on Toss Securities API specs
+- Current task: Add a direct OpenAI `oauth` auth mode using local OAuth metadata or env bearer tokens; do not call Codex CLI
 
 ## Milestone Progress
 
@@ -184,6 +184,7 @@ Update it whenever development state changes.
 - [x] M22 abnormal-stop finalizer summaries implemented.
 - [x] M22 background review trigger records implemented.
 - [x] OpenAI workload identity auth mode implemented for config, provider status, daemon health, and model gateway token exchange.
+- [x] OpenAI direct OAuth auth mode implemented for config, provider status, daemon health, model gateway bearer use, and insufficient-scope failure records.
 
 ## M0 Checklist
 
@@ -523,6 +524,11 @@ Update it whenever development state changes.
 - 2026-06-27: `OPENAI_AUTH_MODE=workload_identity ... npx --yes pnpm@11.8.0 doctor` passed with `openai.credentials: ok (workload identity env)` using fixture env names and no token value output.
 - 2026-06-27: WIF-mode daemon smoke test passed on port 3199; `/status.providers.openai.auth_mode` returned `workload_identity`, provider configured true, and real trading remained disabled.
 - 2026-06-27: Final OpenAI auth contract verification passed after removing stale `oauth` usage-record auth mode: `git diff --check`, `npx --yes pnpm@11.8.0 test`, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, and `npx --yes pnpm@11.8.0 doctor`.
+- 2026-06-27: OpenAI direct OAuth TDD red phase confirmed for missing `oauth` config schema, usage contract auth mode, provider OAuth readiness, daemon health/status support, and insufficient-scope classification.
+- 2026-06-27: Targeted OAuth verification passed: `npx --yes pnpm@11.8.0 test packages/config/src/config.test.ts packages/contracts/src/contracts.test.ts packages/model-gateway/src/routing.test.ts apps/daemon/src/status.test.ts`, 48 tests.
+- 2026-06-27: Full direct OAuth verification passed: `git diff --check`, `npx --yes pnpm@11.8.0 test` with 186 tests, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, and default `npx --yes pnpm@11.8.0 doctor`.
+- 2026-06-27: OAuth-mode doctor passed with `OPENAI_AUTH_MODE=oauth`; `openai.credentials: ok (oauth codex auth json)` and no token values printed.
+- 2026-06-27: Direct OpenAI Responses smoke with the local OAuth bearer returned HTTP 401 and missing `api.responses.write` scope, matching the new `insufficient_scope` failure path.
 - 2026-06-21: Docs relative link check passed before plan work.
 - 2026-06-21: TDD red phase confirmed with 6 failing suites for missing implementation files.
 - 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 6 files and 13 tests.
@@ -908,7 +914,7 @@ Update it whenever development state changes.
 - `gh` CLI is not installed in the current environment, so automatic PR creation is unavailable.
 - WSL does not have a global `pnpm` binary. Verification used `npx --yes pnpm@11.8.0 ...`.
 - Broker target is Toss Securities; official API specs, terms, and detailed securities API information will be supplied later by the user.
-- OpenAI API auth supports API key mode and official workload identity federation mode; browser OAuth or ChatGPT/Codex login sessions are not reused as Dore API credentials.
+- OpenAI API auth supports API key mode, direct OAuth bearer mode, and official workload identity federation mode. OAuth mode reads local metadata or env tokens but Dore calls OpenAI directly and does not call Codex CLI.
 - Real trading remains disabled.
 - M0-M15 are local MVP complete; M16-M17 are post-MVP broker/real-trading work.
 - M16 cannot begin safely beyond input collection without official Toss Securities API documentation, API terms, account permission constraints, credential references, desired pilot risk limits, and explicit approval policy.
@@ -919,4 +925,4 @@ Update it whenever development state changes.
 
 ## Next Action
 
-OpenAI workload identity auth support is implemented and verified. To use it with real OpenAI API calls, supply official WIF environment values or continue with API-key mode. Continue M16 input collection for Toss Securities, but keep connector planning and implementation blocked until the user supplies completed official API inputs.
+OpenAI direct OAuth support is implemented and verified at the config, status, health, usage-contract, and model-gateway layers. The current local OAuth token is present but lacks the `api.responses.write` scope for real Responses API calls, so Dore will surface that as `insufficient_scope`; use a scoped OAuth bearer, official WIF env values, or API-key mode for successful OpenAI calls. Continue M16 input collection for Toss Securities, but keep connector planning and implementation blocked until the user supplies completed official API inputs.

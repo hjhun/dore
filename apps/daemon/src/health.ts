@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export type HealthStatus = "ok" | "degraded" | "failed";
@@ -92,6 +92,17 @@ function optionalEnvCheck(
 }
 
 function openAiCredentialCheck(env: Record<string, string | undefined>): HealthCheck {
+  if (env.OPENAI_AUTH_MODE === "oauth") {
+    const hasEnvToken = Boolean(nonEmpty(env.OPENAI_OAUTH_ACCESS_TOKEN));
+    const hasLocalAuth = hasOpenAiOAuthAuthJson(env);
+    return {
+      id: "openai.credentials",
+      label: "OpenAI credentials",
+      status: hasEnvToken || hasLocalAuth ? "ok" : "warning",
+      severity: "optional",
+      detail: hasEnvToken ? "oauth env" : "oauth codex auth json"
+    };
+  }
   if (env.OPENAI_AUTH_MODE === "workload_identity") {
     const hasWorkloadIdentity =
       Boolean(env.OPENAI_WIF_ACCESS_TOKEN) ||
@@ -107,4 +118,39 @@ function openAiCredentialCheck(env: Record<string, string | undefined>): HealthC
     };
   }
   return optionalEnvCheck("openai.credentials", "OpenAI credentials", "OPENAI_API_KEY", env);
+}
+
+function hasOpenAiOAuthAuthJson(env: Record<string, string | undefined>): boolean {
+  const authFile = oauthAuthFilePath(env);
+  if (!authFile || !existsSync(authFile)) {
+    return false;
+  }
+  try {
+    const payload = JSON.parse(readFileSync(authFile, "utf8")) as {
+      access_token?: string;
+      tokens?: {
+        access_token?: string;
+      };
+    };
+    return Boolean(nonEmpty(payload.tokens?.access_token) ?? nonEmpty(payload.access_token));
+  } catch {
+    return false;
+  }
+}
+
+function oauthAuthFilePath(env: Record<string, string | undefined>): string | undefined {
+  const explicit = nonEmpty(env.OPENAI_OAUTH_CODEX_AUTH_FILE);
+  if (explicit) {
+    return explicit;
+  }
+  const codexHome = nonEmpty(env.CODEX_HOME);
+  if (codexHome) {
+    return join(codexHome, "auth.json");
+  }
+  const home = nonEmpty(env.HOME);
+  return home ? join(home, ".codex", "auth.json") : undefined;
+}
+
+function nonEmpty(value: string | undefined): string | undefined {
+  return value && value.trim().length > 0 ? value : undefined;
 }

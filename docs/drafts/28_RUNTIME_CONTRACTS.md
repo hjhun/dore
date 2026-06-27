@@ -130,7 +130,7 @@ id: usage_20260621_000001
 task_id: optional task id
 provider: openai | claude | gemini
 model: string
-auth_mode: api_key | workload_identity
+auth_mode: api_key | oauth | workload_identity
 category: assistant | engineering | review | briefing | trading_report | background
 started_at: ISO-8601
 ended_at: ISO-8601
@@ -142,6 +142,11 @@ latency_ms: number
 status: success | failed | cancelled
 error_code: optional string
 ```
+
+OpenAI OAuth failures:
+
+- `insufficient_scope`: OAuth bearer token exists, but OpenAI rejects the API
+  call because the token lacks the required API scope.
 
 비용 정책:
 

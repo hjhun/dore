@@ -11,6 +11,10 @@ llm:
       enabled: true
       auth_mode: api_key
       api_key_env: OPENAI_API_KEY
+      oauth:
+        token_source: codex_auth_json
+        access_token_env: OPENAI_OAUTH_ACCESS_TOKEN
+        codex_auth_file_env: OPENAI_OAUTH_CODEX_AUTH_FILE
       workload_identity:
         subject_token_env: OPENAI_WIF_SUBJECT_TOKEN
         identity_provider_id_env: OPENAI_WIF_IDENTITY_PROVIDER_ID

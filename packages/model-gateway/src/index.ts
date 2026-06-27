@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -16,7 +17,8 @@ export interface ModelSelection {
 }
 
 type Provider = ModelSelection["selected_provider"];
-type AuthMode = "api_key" | "workload_identity";
+type AuthMode = "api_key" | "oauth" | "workload_identity";
+type CredentialSource = "env" | "codex_auth_json";
 type UsageStatus = "success" | "failed" | "cancelled";
 
 const DEFAULT_PROVIDER: Provider = "openai";
@@ -77,6 +79,7 @@ export interface ProviderStatus {
   available: boolean;
   auth_mode: AuthMode;
   configured_model: string;
+  credential_source?: CredentialSource;
   reason?: "missing_credentials" | "client_not_configured";
 }
 
@@ -139,14 +142,16 @@ export function createProviderRegistry(input: {
     status(): ProviderStatus[] {
       return (["openai", "claude", "gemini"] as Provider[]).map((provider) => {
         const authMode = authModeForProvider(provider, env);
-        const key = credentialForProvider(provider, env);
+        const credential = credentialForProvider(provider, env);
         const workloadIdentity = workloadIdentityForProvider(provider, env);
-        const available = authMode === "workload_identity" ? Boolean(key || workloadIdentity) : Boolean(key);
+        const available =
+          authMode === "workload_identity" ? Boolean(credential.value || workloadIdentity) : Boolean(credential.value);
         return {
           provider,
           available,
           auth_mode: authMode,
           configured_model: MODELS[provider].standard,
+          credential_source: credential.source,
           reason: available ? undefined : "missing_credentials"
         };
       });
@@ -156,7 +161,7 @@ export function createProviderRegistry(input: {
       return {
         provider,
         authMode,
-        apiKey: credentialForProvider(provider, env),
+        apiKey: credentialForProvider(provider, env).value,
         workloadIdentity: workloadIdentityForProvider(provider, env),
         client: clients[provider]
       };
@@ -246,7 +251,8 @@ export function createModelGateway(input: {
         if (provider.authMode === "workload_identity" && !resolvedCredential && provider.workloadIdentity) {
           resolvedCredential = (await workloadIdentityTokenExchanger(provider.workloadIdentity)).accessToken;
         }
-      } catch {
+      } catch (error) {
+        const errorCode = classifyProviderError(error);
         const usage = await appendUsageRecord(input.memoryRoot, {
           id: createUsageId(startedAt, selection.selected_provider),
           task_id: request.task_id,
@@ -262,7 +268,7 @@ export function createModelGateway(input: {
           estimated_cost_usd: 0,
           latency_ms: elapsedMs(startedTime, Date.parse(now())),
           status: "failed",
-          error_code: "provider_error"
+          error_code: errorCode
         });
         return {
           status: "failed",
@@ -270,7 +276,7 @@ export function createModelGateway(input: {
           model: selection.selected_model,
           auth_mode: authMode,
           usage,
-          error_code: "provider_error"
+          error_code: errorCode
         };
       }
 
@@ -366,7 +372,8 @@ export function createModelGateway(input: {
               }
             : undefined
         };
-      } catch {
+      } catch (error) {
+        const errorCode = classifyProviderError(error);
         const usage = await appendUsageRecord(input.memoryRoot, {
           id: createUsageId(startedAt, selection.selected_provider),
           task_id: request.task_id,
@@ -382,7 +389,7 @@ export function createModelGateway(input: {
           estimated_cost_usd: 0,
           latency_ms: elapsedMs(startedTime, Date.parse(now())),
           status: "failed",
-          error_code: "provider_error"
+          error_code: errorCode
         });
         return {
           status: "failed",
@@ -390,7 +397,7 @@ export function createModelGateway(input: {
           model: selection.selected_model,
           auth_mode: authMode,
           usage,
-          error_code: "provider_error"
+          error_code: errorCode
         };
       }
     }
@@ -434,19 +441,30 @@ async function appendUsageRecord(memoryRoot: string, record: LlmUsageRecord): Pr
   return parsed;
 }
 
-function credentialForProvider(provider: Provider, env: Partial<NodeJS.ProcessEnv>): string | undefined {
+function credentialForProvider(
+  provider: Provider,
+  env: Partial<NodeJS.ProcessEnv>
+): { value?: string; source?: CredentialSource } {
   if (provider === "openai" && authModeForProvider(provider, env) === "workload_identity") {
-    return nonEmpty(env.OPENAI_WIF_ACCESS_TOKEN);
+    const accessToken = nonEmpty(env.OPENAI_WIF_ACCESS_TOKEN);
+    return { value: accessToken, source: accessToken ? "env" : undefined };
+  }
+  if (provider === "openai" && authModeForProvider(provider, env) === "oauth") {
+    return oauthCredentialForOpenAi(env);
   }
   const envName: Record<Provider, string> = {
     openai: "OPENAI_API_KEY",
     claude: "ANTHROPIC_API_KEY",
     gemini: "GEMINI_API_KEY"
   };
-  return nonEmpty(env[envName[provider]]);
+  const apiKey = nonEmpty(env[envName[provider]]);
+  return { value: apiKey, source: apiKey ? "env" : undefined };
 }
 
 function authModeForProvider(provider: Provider, env: Partial<NodeJS.ProcessEnv>): AuthMode {
+  if (provider === "openai" && env.OPENAI_AUTH_MODE === "oauth") {
+    return "oauth";
+  }
   if (provider === "openai" && env.OPENAI_AUTH_MODE === "workload_identity") {
     return "workload_identity";
   }
@@ -474,8 +492,63 @@ function workloadIdentityForProvider(
   };
 }
 
+function oauthCredentialForOpenAi(env: Partial<NodeJS.ProcessEnv>): { value?: string; source?: CredentialSource } {
+  const envToken = nonEmpty(env.OPENAI_OAUTH_ACCESS_TOKEN);
+  if (envToken) {
+    return { value: envToken, source: "env" };
+  }
+  const authFile = oauthAuthFilePath(env);
+  if (!authFile || !existsSync(authFile)) {
+    return {};
+  }
+  try {
+    const payload = JSON.parse(readFileSync(authFile, "utf8")) as {
+      access_token?: string;
+      tokens?: {
+        access_token?: string;
+      };
+    };
+    return {
+      value: nonEmpty(payload.tokens?.access_token) ?? nonEmpty(payload.access_token),
+      source: "codex_auth_json"
+    };
+  } catch {
+    return {};
+  }
+}
+
+function oauthAuthFilePath(env: Partial<NodeJS.ProcessEnv>): string | undefined {
+  const explicit = nonEmpty(env.OPENAI_OAUTH_CODEX_AUTH_FILE);
+  if (explicit) {
+    return explicit;
+  }
+  const codexHome = nonEmpty(env.CODEX_HOME);
+  if (codexHome) {
+    return join(codexHome, "auth.json");
+  }
+  const home = nonEmpty(env.HOME);
+  return home ? join(home, ".codex", "auth.json") : undefined;
+}
+
 function nonEmpty(value: string | undefined): string | undefined {
   return value && value.trim().length > 0 ? value : undefined;
+}
+
+function classifyProviderError(error: unknown): string {
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : typeof error === "string"
+        ? error.toLowerCase()
+        : JSON.stringify(error)?.toLowerCase() ?? "";
+  if (
+    message.includes("missing scopes") ||
+    message.includes("insufficient permissions") ||
+    message.includes("insufficient_scope")
+  ) {
+    return "insufficient_scope";
+  }
+  return "provider_error";
 }
 
 async function exchangeWorkloadIdentityToken(

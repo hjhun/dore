@@ -611,3 +611,62 @@
 
 - Background review execution remains a later runtime concern; M22 records the deterministic trigger.
 - M16/M17 broker connector work remains blocked on official user-provided broker/API inputs.
+
+## 2026-06-27 OpenAI Direct OAuth Slice
+
+## Inputs Used
+
+- Prompt: add an OAuth auth path so Dore directly uses OpenAI; do not integrate Codex CLI.
+- Requirements: Dore provider auth must stay secret-safe and usage records must reflect auth mode.
+- Design: existing config, model-gateway provider registry, daemon health/status, and runtime contracts.
+- Dashboard: `.dev/DASHBOARD.md`.
+
+## Implementation Summary
+
+- Added OpenAI `oauth` auth mode to config and usage contracts.
+- Added direct OAuth bearer resolution from `OPENAI_OAUTH_ACCESS_TOKEN` or local auth metadata.
+- Added daemon health/status readiness for OAuth metadata without exposing token values.
+- Added `insufficient_scope` classification for OpenAI OAuth scope failures.
+- Updated provider docs, config docs, runtime contracts, dashboard, and progress notes.
+
+## Files Changed
+
+- `.dev/DASHBOARD.md`
+- `.dev/DEVELOPMENT.md`
+- `.dev/progress/developer.md`
+- `apps/daemon/src/health.ts`
+- `apps/daemon/src/status.test.ts`
+- `configs/dore.config.example.yaml`
+- `docs/drafts/13_LLM_PROVIDERS.md`
+- `docs/drafts/22_CONFIG_SCHEMA_DRAFT.md`
+- `docs/drafts/28_RUNTIME_CONTRACTS.md`
+- `packages/config/src/index.ts`
+- `packages/config/src/config.test.ts`
+- `packages/contracts/src/index.ts`
+- `packages/contracts/src/contracts.test.ts`
+- `packages/model-gateway/src/index.ts`
+- `packages/model-gateway/src/routing.test.ts`
+
+## TDD And Tests
+
+- Red result: targeted tests failed for missing OAuth config/schema/status and insufficient-scope behavior.
+- Green result: targeted OAuth tests passed, 48 tests.
+- Broader verification:
+  - `git diff --check`
+  - `npx --yes pnpm@11.8.0 test`, 17 files and 186 tests
+  - `npx --yes pnpm@11.8.0 build`
+  - `npx --yes pnpm@11.8.0 build:desktop`
+  - `npx --yes pnpm@11.8.0 doctor`
+  - `OPENAI_AUTH_MODE=oauth npx --yes pnpm@11.8.0 doctor`
+
+## Code Quality Notes
+
+- Style: OAuth handling follows the existing provider registry and daemon health patterns.
+- Static analysis: TypeScript build passes.
+- Thread safety: no shared mutable state was introduced.
+- Security: token values are not emitted in status, doctor output, docs, or usage records.
+
+## Risks And Blockers
+
+- The current local OAuth bearer exists but lacks `api.responses.write`; direct OpenAI Responses API smoke returned HTTP 401.
+- Real successful OpenAI calls require a scoped OAuth bearer, official WIF values, or API-key mode.

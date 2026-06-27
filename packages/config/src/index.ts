@@ -36,11 +36,20 @@ const WorkloadIdentityConfigSchema = z
   })
   .default({});
 
+const OAuthConfigSchema = z
+  .object({
+    token_source: z.enum(["env", "codex_auth_json"]).default("codex_auth_json"),
+    access_token_env: z.string().default("OPENAI_OAUTH_ACCESS_TOKEN"),
+    codex_auth_file_env: z.string().default("OPENAI_OAUTH_CODEX_AUTH_FILE")
+  })
+  .default({});
+
 const OpenAiProviderConfigSchema = z
   .object({
     enabled: z.boolean().default(true),
-    auth_mode: z.enum(["api_key", "workload_identity"]).default("api_key"),
+    auth_mode: z.enum(["api_key", "oauth", "workload_identity"]).default("api_key"),
     api_key_env: z.string().default("OPENAI_API_KEY"),
+    oauth: OAuthConfigSchema,
     workload_identity: WorkloadIdentityConfigSchema,
     default_model: z.string().default("gpt-5.4")
   })

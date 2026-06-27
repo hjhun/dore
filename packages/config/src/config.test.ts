@@ -105,4 +105,24 @@ describe("config schema", () => {
     expect(config.llm.providers.openai.auth_mode).toBe("workload_identity");
     expect(config.llm.providers.openai.workload_identity.subject_token_env).toBe("OPENAI_WIF_SUBJECT_TOKEN");
   });
+
+  it("accepts OpenAI OAuth auth configuration from local auth metadata", () => {
+    const config = parseConfig({
+      llm: {
+        providers: {
+          openai: {
+            auth_mode: "oauth",
+            oauth: {
+              token_source: "codex_auth_json",
+              codex_auth_file_env: "OPENAI_OAUTH_CODEX_AUTH_FILE"
+            }
+          }
+        }
+      }
+    });
+
+    expect(config.llm.providers.openai.auth_mode).toBe("oauth");
+    expect(config.llm.providers.openai.oauth.token_source).toBe("codex_auth_json");
+    expect(config.llm.providers.openai.oauth.codex_auth_file_env).toBe("OPENAI_OAUTH_CODEX_AUTH_FILE");
+  });
 });
