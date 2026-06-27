@@ -184,6 +184,7 @@ Update it whenever development state changes.
 - [x] M22 abnormal-stop finalizer summaries implemented.
 - [x] M22 background review trigger records implemented.
 - [x] OpenAI workload identity auth mode implemented for config, provider status, daemon health, and model gateway token exchange.
+- [x] Codex OAuth-backed local runner status and task route implemented without exposing local token values.
 
 ## M0 Checklist
 
@@ -523,6 +524,11 @@ Update it whenever development state changes.
 - 2026-06-27: `OPENAI_AUTH_MODE=workload_identity ... npx --yes pnpm@11.8.0 doctor` passed with `openai.credentials: ok (workload identity env)` using fixture env names and no token value output.
 - 2026-06-27: WIF-mode daemon smoke test passed on port 3199; `/status.providers.openai.auth_mode` returned `workload_identity`, provider configured true, and real trading remained disabled.
 - 2026-06-27: Final OpenAI auth contract verification passed after removing stale `oauth` usage-record auth mode: `git diff --check`, `npx --yes pnpm@11.8.0 test`, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, and `npx --yes pnpm@11.8.0 doctor`.
+- 2026-06-27: Codex runner TDD red phase confirmed for missing runner status helper, missing Codex task wrapper, missing daemon `codex-run` route, and missing `/status.engineering.codex_runner`.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts` passed after Codex runner implementation, 17 files and 184 tests.
+- 2026-06-27: `codex exec --cd /home/hjhun/samba/workspace/dore --json 'Return only the word ready.'` passed using the local Codex OAuth session.
+- 2026-06-27: Codex-runner daemon smoke test passed on port 3198; `/status.engineering.codex_runner` returned `auth_mode: chatgpt`, token presence booleans, and no token values.
+- 2026-06-27: `git diff --check`, `npx --yes pnpm@11.8.0 test`, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, and `npx --yes pnpm@11.8.0 doctor` passed after Codex runner implementation.
 - 2026-06-21: Docs relative link check passed before plan work.
 - 2026-06-21: TDD red phase confirmed with 6 failing suites for missing implementation files.
 - 2026-06-21: `npx --yes pnpm@11.8.0 test` passed, 6 files and 13 tests.
@@ -908,7 +914,7 @@ Update it whenever development state changes.
 - `gh` CLI is not installed in the current environment, so automatic PR creation is unavailable.
 - WSL does not have a global `pnpm` binary. Verification used `npx --yes pnpm@11.8.0 ...`.
 - Broker target is Toss Securities; official API specs, terms, and detailed securities API information will be supplied later by the user.
-- OpenAI API auth supports API key mode and official workload identity federation mode; browser OAuth or ChatGPT/Codex login sessions are not reused as Dore API credentials.
+- OpenAI API auth supports API key mode and official workload identity federation mode; ChatGPT/Codex OAuth is used only through the local Codex CLI runner, not as a raw Dore API credential.
 - Real trading remains disabled.
 - M0-M15 are local MVP complete; M16-M17 are post-MVP broker/real-trading work.
 - M16 cannot begin safely beyond input collection without official Toss Securities API documentation, API terms, account permission constraints, credential references, desired pilot risk limits, and explicit approval policy.
@@ -919,4 +925,4 @@ Update it whenever development state changes.
 
 ## Next Action
 
-OpenAI workload identity auth support is implemented and verified. To use it with real OpenAI API calls, supply official WIF environment values or continue with API-key mode. Continue M16 input collection for Toss Securities, but keep connector planning and implementation blocked until the user supplies completed official API inputs.
+Codex runner integration is implemented and verified through the local OAuth-backed `codex exec` CLI. Continue M16 input collection for Toss Securities, but keep connector planning and implementation blocked until the user supplies completed official API inputs.

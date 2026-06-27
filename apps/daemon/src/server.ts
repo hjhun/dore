@@ -32,10 +32,12 @@ import type {
 } from "../../../packages/engineering/src/index.js";
 import {
   appendCodeReviewReportEvent,
+  appendCodexAgentRunEvent,
   appendEngineeringRiskReviewEvent,
   appendFileEditEvent,
   appendTestExecutionEvent,
   applyControlledFileEdit,
+  createCodexRunnerStatus,
   createCodeReviewReport,
   createEngineeringRiskReview,
   createFailedVerificationSummary,
@@ -43,6 +45,7 @@ import {
   createTestExecutionRecord,
   executeAllowedCommand,
   runEngineeringIntake,
+  runCodexAgentTask,
   summarizeDevelopmentAgentLoopStatus,
   summarizeDevelopmentTaskStages
 } from "../../../packages/engineering/src/index.js";
@@ -81,6 +84,8 @@ export interface DaemonAppOptions {
   packageJson?: PackageJsonLike;
   engineeringExecFile?: (command: string, args: string[]) => Promise<ExecFileResult>;
   engineeringCommandExecFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
+  engineeringCodexExecFile?: (command: string, args: string[], options?: { cwd?: string }) => Promise<ExecFileResult>;
+  codexAuthFilePath?: string;
   localAuthToken?: string;
   telegramConfig?: DoreConfig["telegram"];
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
@@ -217,6 +222,10 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       },
       trading: await createLocalTradingStatus(memoryRoot, startedAt, options.tradingConfig),
       engineering: {
+        codex_runner: await createCodexRunnerStatus({
+          authFilePath: options.codexAuthFilePath,
+          execFile: options.engineeringCodexExecFile
+        }),
         tasks: Array.from(engineeringTasks.values()).map((task) => ({
           id: task.intake.id,
           title: task.intake.projectName,
@@ -843,6 +852,51 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       task_id: task.intake.id,
       task_status: task.status,
       execution,
+      failed_verification: task.failedVerification ? toDaemonFailedVerification(task.failedVerification) : undefined,
+      loop_status: toDaemonAgentLoopStatus(
+        summarizeDevelopmentAgentLoopStatus({
+          intake: task.intake,
+          taskStatus: task.status,
+          failedVerification: task.failedVerification,
+          reviewRetryAttempted: Boolean(task.reviewReport)
+        })
+      ),
+      event_log: task.eventLogPath
+    });
+  });
+
+  app.post("/engineering/tasks/:id/codex-run", async (request, reply) => {
+    const params = request.params as { id?: string };
+    const task = params.id ? engineeringTasks.get(params.id) : undefined;
+    if (!task) {
+      return reply.code(404).send({
+        error: "task_not_found"
+      });
+    }
+
+    const payload = request.body as { prompt?: unknown; now?: unknown } | null;
+    const prompt = typeof payload?.prompt === "string" && payload.prompt.trim() ? payload.prompt.trim() : "";
+    if (!prompt) {
+      return reply.code(400).send({
+        error: "prompt_required"
+      });
+    }
+
+    const run = await runCodexAgentTask({
+      prompt,
+      projectRoot,
+      now: typeof payload?.now === "string" && payload.now.trim() ? payload.now.trim() : new Date().toISOString(),
+      execFile: options.engineeringCodexExecFile
+    });
+    await appendCodexAgentRunEvent(task.eventLogPath, task.intake, run);
+    task.status = run.status === "passed" ? "completed" : "failed";
+    task.lastCommand = run.command;
+    task.failedVerification = createFailedVerificationSummary(run);
+
+    return reply.code(201).send({
+      task_id: task.intake.id,
+      task_status: task.status,
+      codex_run: run,
       failed_verification: task.failedVerification ? toDaemonFailedVerification(task.failedVerification) : undefined,
       loop_status: toDaemonAgentLoopStatus(
         summarizeDevelopmentAgentLoopStatus({

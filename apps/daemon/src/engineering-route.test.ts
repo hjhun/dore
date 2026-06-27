@@ -331,6 +331,106 @@ describe("daemon engineering routes", () => {
     expect(runResponse.json().task_status).toBe("completed");
   });
 
+  it("exposes Codex runner status without local OAuth token values", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const authFilePath = join(memoryRoot, "codex-auth.json");
+    await writeFile(
+      authFilePath,
+      JSON.stringify({
+        auth_mode: "chatgpt",
+        tokens: {
+          access_token: "codex-access-token",
+          refresh_token: "codex-refresh-token"
+        },
+        last_refresh: "2026-06-25T01:20:27.511681540Z"
+      }),
+      "utf8"
+    );
+    const app = createDaemonApp({
+      memoryRoot,
+      codexAuthFilePath: authFilePath,
+      engineeringCodexExecFile: async (command, args) => {
+        expect(command).toBe("codex");
+        expect(args).toEqual(["--version"]);
+        return { stdout: "codex-cli 0.142.0\n" };
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().engineering.codex_runner).toMatchObject({
+      available: true,
+      cli_available: true,
+      auth_file_present: true,
+      auth_mode: "chatgpt",
+      has_access_token: true,
+      has_refresh_token: true
+    });
+    expect(JSON.stringify(response.json())).not.toContain("codex-access-token");
+    expect(JSON.stringify(response.json())).not.toContain("codex-refresh-token");
+  });
+
+  it("runs Codex agent tasks through the task route and logs the outcome", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
+    const app = createDaemonApp({
+      memoryRoot,
+      projectRoot: "/workspace/dore",
+      engineeringExecFile: async (_command, args) => {
+        if (args.join(" ") === "-C /workspace/dore branch --show-current") {
+          return { stdout: "feature/codex-runner\n" };
+        }
+        if (args.join(" ") === "-C /workspace/dore status --short") {
+          return { stdout: "" };
+        }
+        throw new Error(`unexpected args: ${args.join(" ")}`);
+      },
+      engineeringCodexExecFile: async (command, args, options) => {
+        expect(command).toBe("codex");
+        expect(args).toEqual(["exec", "--cd", "/workspace/dore", "--json", "Review current task"]);
+        expect(options?.cwd).toBe("/workspace/dore");
+        return {
+          stdout: "reviewed\nCODEX_ACCESS_TOKEN=secret-value",
+          stderr: ""
+        };
+      }
+    });
+    const intakeResponse = await app.inject({
+      method: "POST",
+      url: "/engineering/intake",
+      payload: {
+        idea: "Run Codex runner",
+        now: "2026-06-27T06:10:00.000Z"
+      }
+    });
+    const taskId = intakeResponse.json().task_id;
+
+    const runResponse = await app.inject({
+      method: "POST",
+      url: `/engineering/tasks/${taskId}/codex-run`,
+      payload: {
+        prompt: "Review current task",
+        now: "2026-06-27T06:11:00.000Z"
+      }
+    });
+
+    expect(runResponse.statusCode).toBe(201);
+    expect(runResponse.json()).toMatchObject({
+      task_id: taskId,
+      task_status: "completed",
+      codex_run: {
+        command: "codex exec",
+        status: "passed",
+        outputSummary: "reviewed\nCODEX_ACCESS_TOKEN=<redacted>"
+      }
+    });
+    expect(JSON.stringify(runResponse.json())).not.toContain("secret-value");
+    expect(await readFile(runResponse.json().event_log, "utf8")).toContain("Codex agent run passed");
+  });
+
   it("stores severity-ordered code review reports for engineering tasks", async () => {
     const memoryRoot = await mkdtemp(join(tmpdir(), "dore-daemon-engineering-"));
     const app = createDaemonApp({

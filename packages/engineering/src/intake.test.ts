@@ -9,6 +9,7 @@ import {
   appendFileEditEvent,
   appendReviewSummaryEvent,
   appendTestExecutionEvent,
+  appendCodexAgentRunEvent,
   appendProjectIntakeEvent,
   assessEngineeringActionRisk,
   createCodeReviewReport,
@@ -20,6 +21,7 @@ import {
   createFailedVerificationSummary,
   createFileMutationProof,
   createEngineeringLoopGuardrailSummary,
+  createCodexRunnerStatus,
   summarizeDevelopmentAgentLoopStatus,
   reflectEngineeringMemory,
   createProjectIntake,
@@ -27,6 +29,7 @@ import {
   createTestExecutionRecord,
   detectVerificationCommands,
   executeAllowedCommand,
+  runCodexAgentTask,
   inspectRepository,
   persistProjectIntakeDrafts,
   runEngineeringIntake,
@@ -409,6 +412,94 @@ describe("engineering project intake", () => {
     expect(execution.outputSummary).toContain("partial output");
     expect(execution.outputSummary).toContain(`${tokenName}=<redacted>`);
     expect(execution.outputSummary).not.toContain("token-value");
+  });
+
+  it("reports Codex runner readiness from local OAuth metadata without token values", async () => {
+    const status = await createCodexRunnerStatus({
+      authJson: JSON.stringify({
+        auth_mode: "chatgpt",
+        tokens: {
+          access_token: "codex-access-token",
+          refresh_token: "codex-refresh-token"
+        },
+        last_refresh: "2026-06-25T01:20:27.511681540Z"
+      }),
+      execFile: async (command, args) => {
+        expect(command).toBe("codex");
+        expect(args).toEqual(["--version"]);
+        return {
+          stdout: "codex-cli 0.142.0\n"
+        };
+      }
+    });
+
+    expect(status).toEqual({
+      available: true,
+      cli_available: true,
+      auth_file_present: true,
+      auth_mode: "chatgpt",
+      has_access_token: true,
+      has_refresh_token: true,
+      last_refresh: "2026-06-25T01:20:27.511681540Z",
+      reason: undefined
+    });
+    expect(JSON.stringify(status)).not.toContain("codex-access-token");
+    expect(JSON.stringify(status)).not.toContain("codex-refresh-token");
+  });
+
+  it("runs Codex agent tasks through the CLI and redacts output", async () => {
+    const run = await runCodexAgentTask({
+      prompt: "Summarize repo status",
+      projectRoot: "/workspace/dore",
+      now: "2026-06-27T06:00:00.000Z",
+      execFile: async (command, args, options) => {
+        expect(command).toBe("codex");
+        expect(args).toEqual(["exec", "--cd", "/workspace/dore", "--json", "Summarize repo status"]);
+        expect(options?.cwd).toBe("/workspace/dore");
+        return {
+          stdout: "done\nCODEX_ACCESS_TOKEN=secret-value",
+          stderr: ""
+        };
+      }
+    });
+
+    expect(run).toMatchObject({
+      command: "codex exec",
+      status: "passed",
+      exitCode: 0,
+      outputSummary: "done\nCODEX_ACCESS_TOKEN=<redacted>"
+    });
+    expect(run.outputSummary).not.toContain("secret-value");
+  });
+
+  it("logs Codex agent runs without token fields or token values", async () => {
+    const eventLogPath = join(await mkdtemp(join(tmpdir(), "dore-codex-runner-")), "events.jsonl");
+    const intake = createProjectIntake({
+      idea: "Use Codex runner",
+      requestedBy: "hjhun",
+      now: "2026-06-27T06:00:00.000Z"
+    });
+    const run = {
+      command: "codex exec",
+      status: "passed" as const,
+      exitCode: 0,
+      durationMs: 1000,
+      outputSummary: "ok"
+    };
+
+    await appendCodexAgentRunEvent(eventLogPath, intake, run);
+
+    const [line] = (await readFile(eventLogPath, "utf8")).trim().split("\n");
+    const record = JSON.parse(line);
+    expect(record).toMatchObject({
+      event_type: "task_completed",
+      entity_id: intake.id,
+      summary: "Codex agent run passed: codex exec",
+      command: "codex exec",
+      status: "passed",
+      output_summary: "ok"
+    });
+    expect(JSON.stringify(record)).not.toContain("token");
   });
 
   it("applies a controlled exact file edit inside the project root", async () => {
