@@ -6,10 +6,10 @@ Update it whenever development state changes.
 
 ## Current Focus
 
-- Branch: `codex/add-agent-development-guide`
+- Branch: `main`
 - Active plan: `docs/plan/ROADMAP.md`
-- Active milestone: M21, Development Agent Workflow Depth
-- Current task: M21 local development-agent workflow depth is complete; M16/M17 broker work is blocked by missing official inputs
+- Active milestone: M22, Agent Loop Reliability and Recovery Visibility
+- Current task: Compare against `../ref/hermes-agent`, add agent-loop reliability roadmap, and implement the first loop-status slice; M16/M17 broker work remains blocked by missing official inputs
 
 ## Milestone Progress
 
@@ -176,6 +176,13 @@ Update it whenever development state changes.
 - [x] M21 code-review report storage and desktop visibility implemented.
 - [x] M21 workflow risk review visibility implemented.
 - [x] M21 engineering memory reflection improvements implemented.
+- [x] M22 Hermes agent-loop gap analysis documented.
+- [x] M22 development-agent loop status model implemented.
+- [x] M22 daemon and desktop loop-status visibility implemented.
+- [x] M22 controlled file mutation proof implemented.
+- [x] M22 repeated failure/no-progress guardrail summaries implemented.
+- [x] M22 abnormal-stop finalizer summaries implemented.
+- [x] M22 background review trigger records implemented.
 
 ## M0 Checklist
 
@@ -483,6 +490,17 @@ Update it whenever development state changes.
 - [x] Risk review before broad edits, destructive commands, or external mutations is surfaced in the workflow.
 - [x] Code-review report storage and UI exposure with severity ordering are implemented.
 - [x] Engineering memory reflection improvements cover decisions, regressions, and follow-up tasks.
+
+## M22 Checklist
+
+- [x] Hermes agent-loop gap analysis is documented under `docs/plan/`.
+- [x] Development-agent loop status exposes iteration budget, retry guards, exit reason, and next action.
+- [x] Daemon `/status.engineering.tasks[].loop_status` exposes loop state.
+- [x] Desktop Engineering panel renders loop status.
+- [x] Tool-result proof helper classifies controlled file mutations as landed or failed.
+- [x] Repeated failure and no-progress guardrail summaries are implemented.
+- [x] Finalizer summary covers abnormal stops and budget exhaustion.
+- [x] Background review trigger record is implemented after deterministic loop activity thresholds.
 
 ## Verification Log
 
@@ -828,6 +846,43 @@ Update it whenever development state changes.
 - 2026-06-23: `git diff --check` passed after M21 completion.
 - 2026-06-23: docs/plan relative link check passed after M21 completion, 31 links checked.
 - 2026-06-23: `npx --yes pnpm@11.8.0 doctor` passed after M21 completion.
+- 2026-06-27: M22 Hermes agent-loop gap analysis documented from `../ref/hermes-agent`.
+- 2026-06-27: M22 loop-status TDD red phase confirmed for missing engineering loop status, daemon `loop_status`, desktop mapping, and Engineering panel rendering.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed after M22 loop-status slice, 17 files and 168 tests.
+- 2026-06-27: docs/plan relative link check passed after M22 roadmap updates, 35 links checked.
+- 2026-06-27: `git diff --check` passed after M22 loop-status slice.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test` passed after M22 loop-status slice, 17 files and 168 tests.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build` passed after M22 loop-status slice.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build:desktop` passed after M22 loop-status slice.
+- 2026-06-27: `npx --yes pnpm@11.8.0 doctor` passed after M22 loop-status slice.
+- 2026-06-27: changed-file secret-like scan found no plaintext secret values after M22 loop-status slice.
+- 2026-06-27: M22 tool-result proof TDD red phase confirmed for missing `createFileMutationProof`, missing edit event `mutation_proof`, and missing daemon edit route proof response.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts` passed after M22 tool-result proof, 17 files and 169 tests.
+- 2026-06-27: docs/plan relative link check passed after M22 tool-result proof, 35 links checked.
+- 2026-06-27: `git diff --check` passed after M22 tool-result proof.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test` passed after M22 tool-result proof, 17 files and 169 tests.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build` passed after M22 tool-result proof.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build:desktop` passed after M22 tool-result proof.
+- 2026-06-27: `npx --yes pnpm@11.8.0 doctor` passed after M22 tool-result proof.
+- 2026-06-27: changed-file secret-like scan found no plaintext secret values after M22 tool-result proof.
+- 2026-06-27: M22 repeated failure/no-progress guardrail TDD red phase confirmed for missing `createEngineeringLoopGuardrailSummary`.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed after M22 guardrail summaries, 17 files and 170 tests.
+- 2026-06-27: `git diff --check` passed after M22 guardrail summaries.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test` passed after M22 guardrail summaries, 17 files and 170 tests.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build` passed after M22 guardrail summaries.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build:desktop` passed after M22 guardrail summaries.
+- 2026-06-27: `npx --yes pnpm@11.8.0 doctor` passed after M22 guardrail summaries.
+- 2026-06-27: docs/plan relative link check passed after M22 guardrail summaries, 35 links checked.
+- 2026-06-27: changed-file secret-like scan found no plaintext secret values after M22 guardrail summaries.
+- 2026-06-27: M22 finalizer/background review TDD red phase confirmed for missing `createEngineeringLoopFinalizerSummary`, `createEngineeringBackgroundReviewTrigger`, and `appendEngineeringBackgroundReviewTriggerEvent`.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed after M22 finalizer/background review, 17 files and 172 tests.
+- 2026-06-27: `git diff --check` passed after M22 completion.
+- 2026-06-27: `npx --yes pnpm@11.8.0 test` passed after M22 completion, 17 files and 172 tests.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build` passed after M22 completion.
+- 2026-06-27: `npx --yes pnpm@11.8.0 build:desktop` passed after M22 completion.
+- 2026-06-27: `npx --yes pnpm@11.8.0 doctor` passed after M22 completion.
+- 2026-06-27: docs/plan relative link check passed after M22 completion, 35 links checked.
+- 2026-06-27: changed-file secret-like scan found no plaintext secret values after M22 completion.
 
 ## Known Constraints
 
@@ -840,8 +895,8 @@ Update it whenever development state changes.
 - M16 input collection should use `docs/plan/M16_BROKER_CONNECTOR_INPUT_PACKET.md`.
 - M16 input readiness can be evaluated with `assessBrokerConnectorInputPacket` in `packages/trading`.
 - M16 input packet files can be checked with `npx --yes pnpm@11.8.0 trading:m16-check <packet.json>`.
-- M18-M21 local hardening is complete without broker/API inputs; real trading stays blocked.
+- M18-M21 local hardening is complete without broker/API inputs; M22 agent-loop reliability is in progress; real trading stays blocked.
 
 ## Next Action
 
-No additional local-hardening milestone is currently defined after M21. Keep M16 blocked until the user supplies completed broker/API inputs.
+M22 local agent-loop reliability is complete. Keep M16 blocked until the user supplies completed broker/API inputs.

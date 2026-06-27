@@ -53,6 +53,21 @@ describe("daemon engineering routes", () => {
         id: "intake_2026_06_22_add_daemon_task_wrapper",
         title: "Add daemon task wrapper",
         status: "planned",
+        loop_status: {
+          iteration_budget: {
+            max: 7,
+            used: 2,
+            remaining: 5,
+            exhausted: false
+          },
+          retry_state: {
+            failed_verification_retry_attempted: false,
+            file_mutation_retry_attempted: false,
+            review_retry_attempted: false
+          },
+          exit_reason: "workflow_in_progress",
+          next_action: "Continue the development workflow at the current in-progress stage."
+        },
         stages: expect.arrayContaining([
           expect.objectContaining({ kind: "plan", status: "in_progress" }),
           expect.objectContaining({ kind: "patch", status: "pending" }),
@@ -180,6 +195,21 @@ describe("daemon engineering routes", () => {
         summary: "pnpm build failed with exit code 2.",
         likely_next_action: "Fix the TypeScript/build error, then rerun pnpm build.",
         output_summary: "src/app.ts(12,5): error TS2304: Cannot find name 'missingValue'."
+      },
+      loop_status: {
+        iteration_budget: {
+          max: 7,
+          used: 4,
+          remaining: 3,
+          exhausted: false
+        },
+        retry_state: {
+          failed_verification_retry_attempted: true,
+          file_mutation_retry_attempted: false,
+          review_retry_attempted: false
+        },
+        exit_reason: "failed_verification",
+        next_action: "Fix the TypeScript/build error, then rerun pnpm build."
       }
     });
 
@@ -492,9 +522,17 @@ describe("daemon engineering routes", () => {
 
     expect(editResponse.statusCode).toBe(201);
     expect(editResponse.json().edit.status).toBe("applied");
+    expect(editResponse.json().mutation_proof).toEqual({
+      target: "notes.md",
+      landed: true,
+      status: "applied",
+      evidence: "applied 1 exact replacement"
+    });
     expect(editResponse.json().task_status).toBe("planned");
     expect(await readFile(targetPath, "utf8")).toBe("status: implemented\n");
-    expect(await readFile(editResponse.json().event_log, "utf8")).toContain("Engineering file edit applied");
+    const eventLog = await readFile(editResponse.json().event_log, "utf8");
+    expect(eventLog).toContain("Engineering file edit applied");
+    expect(eventLog).toContain('"landed":true');
   });
 
   it("rejects controlled file edits outside the project root", async () => {

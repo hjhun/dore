@@ -23,6 +23,7 @@ import type {
   CodeReviewReport,
   EngineeringActionRiskInput,
   EngineeringRiskReview,
+  EngineeringAgentLoopStatus,
   ExecFileResult,
   FailedVerificationSummary,
   FileEditRecord,
@@ -38,9 +39,11 @@ import {
   createCodeReviewReport,
   createEngineeringRiskReview,
   createFailedVerificationSummary,
+  createFileMutationProof,
   createTestExecutionRecord,
   executeAllowedCommand,
   runEngineeringIntake,
+  summarizeDevelopmentAgentLoopStatus,
   summarizeDevelopmentTaskStages
 } from "../../../packages/engineering/src/index.js";
 import { createDailyBriefingJob, InMemoryScheduleRegistry } from "../../../packages/scheduler/src/index.js";
@@ -222,6 +225,14 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
           failed_verification: task.failedVerification ? toDaemonFailedVerification(task.failedVerification) : undefined,
           review_report: task.reviewReport ? toDaemonCodeReviewReport(task.reviewReport) : undefined,
           risk_review: task.riskReview ? toDaemonRiskReview(task.riskReview) : undefined,
+          loop_status: toDaemonAgentLoopStatus(
+            summarizeDevelopmentAgentLoopStatus({
+              intake: task.intake,
+              taskStatus: task.status,
+              failedVerification: task.failedVerification,
+              reviewRetryAttempted: Boolean(task.reviewReport)
+            })
+          ),
           stages: summarizeDevelopmentTaskStages({
             intake: task.intake,
             taskStatus: task.status
@@ -788,6 +799,14 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       task_status: task.status,
       execution,
       failed_verification: task.failedVerification ? toDaemonFailedVerification(task.failedVerification) : undefined,
+      loop_status: toDaemonAgentLoopStatus(
+        summarizeDevelopmentAgentLoopStatus({
+          intake: task.intake,
+          taskStatus: task.status,
+          failedVerification: task.failedVerification,
+          reviewRetryAttempted: Boolean(task.reviewReport)
+        })
+      ),
       event_log: task.eventLogPath
     });
   });
@@ -825,6 +844,14 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       task_status: task.status,
       execution,
       failed_verification: task.failedVerification ? toDaemonFailedVerification(task.failedVerification) : undefined,
+      loop_status: toDaemonAgentLoopStatus(
+        summarizeDevelopmentAgentLoopStatus({
+          intake: task.intake,
+          taskStatus: task.status,
+          failedVerification: task.failedVerification,
+          reviewRetryAttempted: Boolean(task.reviewReport)
+        })
+      ),
       event_log: task.eventLogPath
     });
   });
@@ -923,6 +950,7 @@ export function createDaemonApp(options: DaemonAppOptions = {}) {
       task_id: task.intake.id,
       task_status: task.status,
       edit,
+      mutation_proof: createFileMutationProof(edit),
       event_log: task.eventLogPath
     });
   });
@@ -1705,6 +1733,24 @@ function toDaemonFailedVerification(summary: FailedVerificationSummary): Record<
     summary: summary.summary,
     likely_next_action: summary.likelyNextAction,
     output_summary: summary.outputSummary
+  };
+}
+
+function toDaemonAgentLoopStatus(status: EngineeringAgentLoopStatus): Record<string, unknown> {
+  return {
+    iteration_budget: {
+      max: status.iterationBudget.max,
+      used: status.iterationBudget.used,
+      remaining: status.iterationBudget.remaining,
+      exhausted: status.iterationBudget.exhausted
+    },
+    retry_state: {
+      failed_verification_retry_attempted: status.retryState.failedVerificationRetryAttempted,
+      file_mutation_retry_attempted: status.retryState.fileMutationRetryAttempted,
+      review_retry_attempted: status.retryState.reviewRetryAttempted
+    },
+    exit_reason: status.exitReason,
+    next_action: status.nextAction
   };
 }
 

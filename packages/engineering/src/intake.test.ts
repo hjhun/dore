@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyControlledFileEdit,
   appendCodeReviewReportEvent,
+  appendEngineeringBackgroundReviewTriggerEvent,
   appendFileEditEvent,
   appendReviewSummaryEvent,
   appendTestExecutionEvent,
@@ -14,7 +15,12 @@ import {
   createDefaultToolRegistry,
   createDevelopmentWorkflow,
   createEngineeringRiskReview,
+  createEngineeringBackgroundReviewTrigger,
+  createEngineeringLoopFinalizerSummary,
   createFailedVerificationSummary,
+  createFileMutationProof,
+  createEngineeringLoopGuardrailSummary,
+  summarizeDevelopmentAgentLoopStatus,
   reflectEngineeringMemory,
   createProjectIntake,
   createReviewSummary,
@@ -478,10 +484,209 @@ describe("engineering project intake", () => {
       entity_id: intake.id,
       summary: "Engineering file edit applied: config.example",
       relative_path: "config.example",
-      replacements: 1
+      replacements: 1,
+      mutation_proof: {
+        target: "config.example",
+        landed: true,
+        status: "applied",
+        evidence: "applied 1 exact replacement"
+      }
     });
     expect(record.edit_summary).toContain(`${["OPENAI", "API", "KEY"].join("_")}=<redacted>`);
     expect(record.edit_summary).not.toContain("abc123");
+  });
+
+  it("classifies controlled file mutation proof without raw patch content", () => {
+    expect(
+      createFileMutationProof({
+        relativePath: "src/app.ts",
+        status: "applied",
+        replacements: 2,
+        summary: "Applied two replacements"
+      })
+    ).toEqual({
+      target: "src/app.ts",
+      landed: true,
+      status: "applied",
+      evidence: "applied 2 exact replacements"
+    });
+    expect(
+      createFileMutationProof({
+        relativePath: "src/app.ts",
+        status: "blocked",
+        replacements: 0,
+        summary: "Exact text not found"
+      })
+    ).toEqual({
+      target: "src/app.ts",
+      landed: false,
+      status: "blocked",
+      evidence: "mutation not applied"
+    });
+  });
+
+  it("summarizes repeated failure and no-progress guardrails", () => {
+    expect(
+      createEngineeringLoopGuardrailSummary({
+        observations: [
+          {
+            kind: "verification",
+            signature: "pnpm test",
+            status: "failed",
+            summary: "same test failure"
+          },
+          {
+            kind: "verification",
+            signature: "pnpm test",
+            status: "failed",
+            summary: "same test failure"
+          }
+        ]
+      })
+    ).toEqual({
+      action: "warn",
+      code: "repeated_failure",
+      count: 2,
+      signature: "pnpm test",
+      message: "Repeated verification failure detected for pnpm test.",
+      nextAction: "Stop retrying the same failure; inspect the latest output and change the patch before retrying."
+    });
+    expect(
+      createEngineeringLoopGuardrailSummary({
+        observations: [
+          {
+            kind: "file_mutation",
+            signature: "src/app.ts",
+            status: "blocked",
+            summary: "exact text not found"
+          },
+          {
+            kind: "file_mutation",
+            signature: "src/app.ts",
+            status: "blocked",
+            summary: "exact text not found"
+          }
+        ]
+      })
+    ).toMatchObject({
+      action: "warn",
+      code: "no_progress",
+      count: 2,
+      signature: "src/app.ts",
+      nextAction: "Reread the target and update the edit plan before retrying."
+    });
+    expect(
+      createEngineeringLoopGuardrailSummary({
+        observations: [
+          {
+            kind: "verification",
+            signature: "pnpm test",
+            status: "passed",
+            summary: "ok"
+          }
+        ]
+      })
+    ).toEqual({
+      action: "allow",
+      code: "ok",
+      count: 0,
+      signature: "",
+      message: "No repeated failure or no-progress loop detected.",
+      nextAction: "Continue the current workflow."
+    });
+  });
+
+  it("finalizes engineering loop endings for normal and abnormal stops", () => {
+    const intake = createProjectIntake({
+      idea: "Finalize loop status",
+      requestedBy: "hjhun",
+      now: "2026-06-27T10:00:00.000Z"
+    });
+    const completed = summarizeDevelopmentAgentLoopStatus({
+      intake,
+      taskStatus: "completed"
+    });
+    const exhausted = summarizeDevelopmentAgentLoopStatus({
+      intake,
+      taskStatus: "planned",
+      usedIterations: 7
+    });
+
+    expect(createEngineeringLoopFinalizerSummary({ loopStatus: completed })).toEqual({
+      completed: true,
+      abnormal: false,
+      exitReason: "completed",
+      message: "Engineering loop completed normally.",
+      nextAction: "No loop action is required."
+    });
+    expect(createEngineeringLoopFinalizerSummary({ loopStatus: exhausted })).toEqual({
+      completed: false,
+      abnormal: true,
+      exitReason: "iteration_budget_exhausted",
+      message: "Engineering loop stopped because the iteration budget was exhausted.",
+      nextAction: "Stop the loop and summarize progress before continuing."
+    });
+    expect(
+      createEngineeringLoopFinalizerSummary({
+        loopStatus: completed,
+        guardrailSummary: {
+          action: "warn",
+          code: "repeated_failure",
+          count: 2,
+          signature: "pnpm test",
+          message: "Repeated verification failure detected for pnpm test.",
+          nextAction: "Stop retrying the same failure; inspect the latest output and change the patch before retrying."
+        }
+      })
+    ).toMatchObject({
+      completed: false,
+      abnormal: true,
+      exitReason: "repeated_failure",
+      message: "Repeated verification failure detected for pnpm test."
+    });
+  });
+
+  it("creates and logs background review trigger records after loop activity thresholds", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "dore-engineering-"));
+    const eventLogPath = join(memoryRoot, "logs", "events", "engineering.jsonl");
+    const intake = createProjectIntake({
+      idea: "Trigger background review",
+      requestedBy: "hjhun",
+      now: "2026-06-27T10:00:00.000Z"
+    });
+    const trigger = createEngineeringBackgroundReviewTrigger({
+      taskId: intake.id,
+      threshold: 3,
+      observations: [
+        { kind: "verification", signature: "pnpm test", status: "failed", summary: "failed" },
+        { kind: "file_mutation", signature: "src/app.ts", status: "blocked", summary: "blocked" },
+        { kind: "review", signature: "review", status: "passed", summary: "reviewed" }
+      ]
+    });
+
+    expect(trigger).toEqual({
+      shouldTrigger: true,
+      reason: "engineering_loop_activity_threshold",
+      activityCount: 3,
+      threshold: 3,
+      refs: [intake.id],
+      nextAction: "Queue a background review of loop progress, guardrails, and memory reflection candidates."
+    });
+
+    await appendEngineeringBackgroundReviewTriggerEvent(eventLogPath, intake, trigger);
+
+    const [line] = (await readFile(eventLogPath, "utf8")).trim().split("\n");
+    const record = JSON.parse(line);
+    expect(record).toMatchObject({
+      event_type: "task_updated",
+      entity_id: intake.id,
+      summary: "Engineering background review triggered: engineering_loop_activity_threshold",
+      background_review_trigger: {
+        should_trigger: true,
+        activity_count: 3,
+        threshold: 3
+      }
+    });
   });
 
   it("defines a default tool registry with approval boundaries", () => {
@@ -548,6 +753,76 @@ describe("engineering project intake", () => {
     expect(summarizeDevelopmentTaskStages({ intake, taskStatus: "failed" })).toContainEqual(
       expect.objectContaining({ kind: "verify", status: "blocked" })
     );
+  });
+
+  it("summarizes Hermes-style agent loop status for development tasks", () => {
+    const intake = createProjectIntake({
+      idea: "Expose loop status",
+      requestedBy: "hjhun",
+      now: "2026-06-27T08:00:00.000Z"
+    });
+    const failedVerification = createFailedVerificationSummary(
+      createTestExecutionRecord({
+        command: "pnpm test",
+        exitCode: 1,
+        startedAt: "2026-06-27T08:00:00.000Z",
+        completedAt: "2026-06-27T08:00:03.000Z",
+        output: "FAIL packages/engineering/src/intake.test.ts"
+      })
+    );
+
+    expect(
+      summarizeDevelopmentAgentLoopStatus({
+        intake,
+        taskStatus: "planned"
+      })
+    ).toEqual({
+      iterationBudget: {
+        max: 7,
+        used: 2,
+        remaining: 5,
+        exhausted: false
+      },
+      retryState: {
+        failedVerificationRetryAttempted: false,
+        fileMutationRetryAttempted: false,
+        reviewRetryAttempted: false
+      },
+      exitReason: "workflow_in_progress",
+      nextAction: "Continue the development workflow at the current in-progress stage."
+    });
+    expect(
+      summarizeDevelopmentAgentLoopStatus({
+        intake,
+        taskStatus: "failed",
+        failedVerification
+      })
+    ).toMatchObject({
+      iterationBudget: {
+        max: 7,
+        used: 4,
+        remaining: 3,
+        exhausted: false
+      },
+      retryState: {
+        failedVerificationRetryAttempted: true
+      },
+      exitReason: "failed_verification",
+      nextAction: "Inspect the failing test output, fix the behavior or test fixture, then rerun pnpm test."
+    });
+    expect(
+      summarizeDevelopmentAgentLoopStatus({
+        intake,
+        taskStatus: "planned",
+        usedIterations: 7
+      })
+    ).toMatchObject({
+      iterationBudget: {
+        exhausted: true
+      },
+      exitReason: "iteration_budget_exhausted",
+      nextAction: "Stop the loop and summarize progress before continuing."
+    });
   });
 
   it("orders code review findings by behavioral severity with file and line references", () => {

@@ -78,9 +78,16 @@ export interface FailedVerificationSummary {
 
 export interface FileEditRecord {
   relativePath: string;
-  status: "applied";
+  status: "applied" | "blocked";
   replacements: number;
   summary: string;
+}
+
+export interface FileMutationProof {
+  target: string;
+  landed: boolean;
+  status: "applied" | "blocked";
+  evidence: string;
 }
 
 export interface ProjectIntake {
@@ -193,6 +200,63 @@ export interface DevelopmentTaskStage {
   kind: DevelopmentWorkflowStepKind;
   title: string;
   status: DevelopmentTaskStageStatus;
+}
+
+export interface EngineeringAgentLoopStatus {
+  iterationBudget: {
+    max: number;
+    used: number;
+    remaining: number;
+    exhausted: boolean;
+  };
+  retryState: {
+    failedVerificationRetryAttempted: boolean;
+    fileMutationRetryAttempted: boolean;
+    reviewRetryAttempted: boolean;
+  };
+  exitReason:
+    | "workflow_in_progress"
+    | "completed"
+    | "failed_verification"
+    | "stopped_with_error"
+    | "iteration_budget_exhausted";
+  nextAction: string;
+}
+
+export type EngineeringLoopObservationKind = "verification" | "file_mutation" | "review";
+export type EngineeringLoopObservationStatus = "passed" | "failed" | "landed" | "blocked";
+
+export interface EngineeringLoopObservation {
+  kind: EngineeringLoopObservationKind;
+  signature: string;
+  status: EngineeringLoopObservationStatus;
+  summary: string;
+}
+
+export interface EngineeringLoopGuardrailSummary {
+  action: "allow" | "warn";
+  code: "ok" | "repeated_failure" | "no_progress";
+  count: number;
+  signature: string;
+  message: string;
+  nextAction: string;
+}
+
+export interface EngineeringLoopFinalizerSummary {
+  completed: boolean;
+  abnormal: boolean;
+  exitReason: EngineeringAgentLoopStatus["exitReason"] | EngineeringLoopGuardrailSummary["code"];
+  message: string;
+  nextAction: string;
+}
+
+export interface EngineeringBackgroundReviewTrigger {
+  shouldTrigger: boolean;
+  reason: "engineering_loop_activity_threshold" | "below_threshold";
+  activityCount: number;
+  threshold: number;
+  refs: string[];
+  nextAction: string;
 }
 
 export interface CodeReviewFindingInput {
@@ -338,6 +402,67 @@ function stageStatusForTask(kind: DevelopmentWorkflowStepKind, taskStatus: "plan
     return "completed";
   }
   return kind === "plan" ? "in_progress" : "pending";
+}
+
+export function summarizeDevelopmentAgentLoopStatus(input: {
+  intake: ProjectIntake;
+  taskStatus: "planned" | "completed" | "failed";
+  failedVerification?: FailedVerificationSummary;
+  fileMutationRetryAttempted?: boolean;
+  reviewRetryAttempted?: boolean;
+  maxIterations?: number;
+  usedIterations?: number;
+}): EngineeringAgentLoopStatus {
+  const stages = summarizeDevelopmentTaskStages({
+    intake: input.intake,
+    taskStatus: input.taskStatus
+  });
+  const max = input.maxIterations ?? stages.length;
+  const used = Math.min(
+    max,
+    input.usedIterations ??
+      stages.filter(
+        (stage) => stage.status === "completed" || stage.status === "in_progress" || stage.status === "blocked"
+      ).length
+  );
+  const remaining = Math.max(0, max - used);
+  const exhausted = remaining === 0 && input.taskStatus !== "completed";
+  const retryState = {
+    failedVerificationRetryAttempted: Boolean(input.failedVerification),
+    fileMutationRetryAttempted: Boolean(input.fileMutationRetryAttempted),
+    reviewRetryAttempted: Boolean(input.reviewRetryAttempted)
+  };
+
+  if (exhausted) {
+    return {
+      iterationBudget: { max, used, remaining, exhausted },
+      retryState,
+      exitReason: "iteration_budget_exhausted",
+      nextAction: "Stop the loop and summarize progress before continuing."
+    };
+  }
+  if (input.taskStatus === "completed") {
+    return {
+      iterationBudget: { max, used, remaining, exhausted },
+      retryState,
+      exitReason: "completed",
+      nextAction: "No loop action is required."
+    };
+  }
+  if (input.taskStatus === "failed") {
+    return {
+      iterationBudget: { max, used, remaining, exhausted },
+      retryState,
+      exitReason: input.failedVerification ? "failed_verification" : "stopped_with_error",
+      nextAction: input.failedVerification?.likelyNextAction ?? "Inspect the failed task event before continuing."
+    };
+  }
+  return {
+    iterationBudget: { max, used, remaining, exhausted },
+    retryState,
+    exitReason: "workflow_in_progress",
+    nextAction: "Continue the development workflow at the current in-progress stage."
+  };
 }
 
 export function createCodeReviewReport(input: { findings: CodeReviewFindingInput[] }): CodeReviewReport {
@@ -732,6 +857,38 @@ export async function appendEngineeringRiskReviewEvent(
   });
 }
 
+export async function appendEngineeringBackgroundReviewTriggerEvent(
+  eventLogPath: string,
+  intake: ProjectIntake,
+  trigger: EngineeringBackgroundReviewTrigger
+): Promise<void> {
+  await appendEvent(eventLogPath, {
+    id: `event_${intake.id}_background_review_trigger`,
+    time: new Date().toISOString(),
+    actor: "dore",
+    event_type: "task_updated",
+    entity_type: "task",
+    entity_id: intake.id,
+    summary: `Engineering background review triggered: ${trigger.reason}`,
+    risk_level: "write",
+    refs: ["engineering_background_review", ...trigger.refs],
+    background_review_trigger: toEngineeringBackgroundReviewTriggerEvent(trigger)
+  });
+}
+
+function toEngineeringBackgroundReviewTriggerEvent(
+  trigger: EngineeringBackgroundReviewTrigger
+): Record<string, string | number | boolean | string[]> {
+  return {
+    should_trigger: trigger.shouldTrigger,
+    reason: trigger.reason,
+    activity_count: trigger.activityCount,
+    threshold: trigger.threshold,
+    refs: trigger.refs,
+    next_action: trigger.nextAction
+  };
+}
+
 function toEngineeringRiskReviewEvent(review: EngineeringRiskReview): Record<string, string | boolean> {
   return {
     kind: review.kind,
@@ -778,6 +935,7 @@ function toFailedVerificationEvent(summary: FailedVerificationSummary): Record<s
 }
 
 export async function appendFileEditEvent(eventLogPath: string, intake: ProjectIntake, edit: FileEditRecord): Promise<void> {
+  const mutationProof = createFileMutationProof(edit);
   await appendEvent(eventLogPath, {
     id: `event_${intake.id}_edit_${slugify(edit.relativePath)}`,
     time: new Date().toISOString(),
@@ -791,8 +949,123 @@ export async function appendFileEditEvent(eventLogPath: string, intake: ProjectI
     relative_path: edit.relativePath,
     status: edit.status,
     replacements: edit.replacements,
-    edit_summary: sanitizeExecutionOutput(edit.summary)
+    edit_summary: sanitizeExecutionOutput(edit.summary),
+    mutation_proof: mutationProof
   });
+}
+
+export function createFileMutationProof(edit: FileEditRecord): FileMutationProof {
+  const landed = edit.status === "applied" && edit.replacements > 0;
+  return {
+    target: edit.relativePath,
+    landed,
+    status: edit.status,
+    evidence: landed ? `applied ${edit.replacements} exact ${pluralize("replacement", edit.replacements)}` : "mutation not applied"
+  };
+}
+
+export function createEngineeringLoopGuardrailSummary(input: {
+  observations: EngineeringLoopObservation[];
+  warnAfter?: number;
+}): EngineeringLoopGuardrailSummary {
+  const warnAfter = input.warnAfter ?? 2;
+  const noProgress = repeatedObservation(input.observations, warnAfter, (observation) => observation.status === "blocked");
+  if (noProgress) {
+    return {
+      action: "warn",
+      code: "no_progress",
+      count: noProgress.count,
+      signature: noProgress.signature,
+      message: `No-progress file mutation loop detected for ${noProgress.signature}.`,
+      nextAction: "Reread the target and update the edit plan before retrying."
+    };
+  }
+  const repeatedFailure = repeatedObservation(
+    input.observations,
+    warnAfter,
+    (observation) => observation.status === "failed"
+  );
+  if (repeatedFailure) {
+    return {
+      action: "warn",
+      code: "repeated_failure",
+      count: repeatedFailure.count,
+      signature: repeatedFailure.signature,
+      message: `Repeated ${repeatedFailure.kind} failure detected for ${repeatedFailure.signature}.`,
+      nextAction: "Stop retrying the same failure; inspect the latest output and change the patch before retrying."
+    };
+  }
+  return {
+    action: "allow",
+    code: "ok",
+    count: 0,
+    signature: "",
+    message: "No repeated failure or no-progress loop detected.",
+    nextAction: "Continue the current workflow."
+  };
+}
+
+export function createEngineeringLoopFinalizerSummary(input: {
+  loopStatus: EngineeringAgentLoopStatus;
+  guardrailSummary?: EngineeringLoopGuardrailSummary;
+}): EngineeringLoopFinalizerSummary {
+  if (input.guardrailSummary && input.guardrailSummary.action === "warn") {
+    return {
+      completed: false,
+      abnormal: true,
+      exitReason: input.guardrailSummary.code,
+      message: input.guardrailSummary.message,
+      nextAction: input.guardrailSummary.nextAction
+    };
+  }
+  if (input.loopStatus.exitReason === "completed") {
+    return {
+      completed: true,
+      abnormal: false,
+      exitReason: "completed",
+      message: "Engineering loop completed normally.",
+      nextAction: input.loopStatus.nextAction
+    };
+  }
+  if (input.loopStatus.exitReason === "iteration_budget_exhausted") {
+    return {
+      completed: false,
+      abnormal: true,
+      exitReason: "iteration_budget_exhausted",
+      message: "Engineering loop stopped because the iteration budget was exhausted.",
+      nextAction: input.loopStatus.nextAction
+    };
+  }
+  return {
+    completed: false,
+    abnormal: input.loopStatus.exitReason !== "workflow_in_progress",
+    exitReason: input.loopStatus.exitReason,
+    message:
+      input.loopStatus.exitReason === "workflow_in_progress"
+        ? "Engineering loop is still in progress."
+        : "Engineering loop stopped before normal completion.",
+    nextAction: input.loopStatus.nextAction
+  };
+}
+
+export function createEngineeringBackgroundReviewTrigger(input: {
+  taskId: string;
+  observations: EngineeringLoopObservation[];
+  threshold?: number;
+}): EngineeringBackgroundReviewTrigger {
+  const threshold = input.threshold ?? 6;
+  const activityCount = input.observations.length;
+  const shouldTrigger = activityCount >= threshold;
+  return {
+    shouldTrigger,
+    reason: shouldTrigger ? "engineering_loop_activity_threshold" : "below_threshold",
+    activityCount,
+    threshold,
+    refs: [input.taskId],
+    nextAction: shouldTrigger
+      ? "Queue a background review of loop progress, guardrails, and memory reflection candidates."
+      : "Continue collecting loop activity before background review."
+  };
 }
 
 export async function persistProjectIntakeDrafts(
@@ -1008,6 +1281,35 @@ function countOccurrences(value: string, needle: string): number {
     offset = index + needle.length;
   }
   return count;
+}
+
+function pluralize(word: string, count: number): string {
+  return count === 1 ? word : `${word}s`;
+}
+
+function repeatedObservation(
+  observations: EngineeringLoopObservation[],
+  warnAfter: number,
+  predicate: (observation: EngineeringLoopObservation) => boolean
+): { kind: EngineeringLoopObservationKind; signature: string; count: number } | null {
+  const counts = new Map<string, { kind: EngineeringLoopObservationKind; signature: string; count: number }>();
+  for (const observation of observations) {
+    if (!predicate(observation)) {
+      continue;
+    }
+    const key = `${observation.kind}:${observation.signature}`;
+    const current = counts.get(key) ?? {
+      kind: observation.kind,
+      signature: observation.signature,
+      count: 0
+    };
+    current.count += 1;
+    if (current.count >= warnAfter) {
+      return current;
+    }
+    counts.set(key, current);
+  }
+  return null;
 }
 
 async function defaultExecFile(command: string, args: string[], options?: { cwd?: string }): Promise<ExecFileResult> {

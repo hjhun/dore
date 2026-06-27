@@ -172,6 +172,21 @@ export interface DashboardStatus {
         riskLevel: string;
         reason: string;
       };
+      loopStatus?: {
+        iterationBudget: {
+          max: number;
+          used: number;
+          remaining: number;
+          exhausted: boolean;
+        };
+        retryState: {
+          failedVerificationRetryAttempted: boolean;
+          fileMutationRetryAttempted: boolean;
+          reviewRetryAttempted: boolean;
+        };
+        exitReason: string;
+        nextAction: string;
+      };
       stages?: Array<{
         kind: string;
         title: string;
@@ -331,6 +346,21 @@ export function createMockDashboardStatus(): DashboardStatus {
           title: "Review generated plan",
           status: "planned",
           lastCommand: "pnpm test",
+          loopStatus: {
+            iterationBudget: {
+              max: 7,
+              used: 2,
+              remaining: 5,
+              exhausted: false
+            },
+            retryState: {
+              failedVerificationRetryAttempted: false,
+              fileMutationRetryAttempted: false,
+              reviewRetryAttempted: false
+            },
+            exitReason: "workflow_in_progress",
+            nextAction: "Continue the development workflow at the current in-progress stage."
+          },
           stages: [
             {
               kind: "plan",
@@ -777,6 +807,16 @@ export function Dashboard({
                     <p>{`Risk review: ${task.riskReview.riskLevel} ${task.riskReview.kind} ${task.riskReview.target}`}</p>
                     <p>{`Approval required: ${task.riskReview.approvalRequired ? "yes" : "no"}`}</p>
                     <p>{`Risk reason: ${task.riskReview.reason}`}</p>
+                  </>
+                ) : null}
+                {task.loopStatus ? (
+                  <>
+                    <p>{`Loop: ${task.loopStatus.exitReason}`}</p>
+                    <p>{`Loop budget: ${task.loopStatus.iterationBudget.used}/${task.loopStatus.iterationBudget.max} used, ${task.loopStatus.iterationBudget.remaining} remaining`}</p>
+                    <p>
+                      {`Loop retry: verification=${task.loopStatus.retryState.failedVerificationRetryAttempted ? "yes" : "no"} file_mutation=${task.loopStatus.retryState.fileMutationRetryAttempted ? "yes" : "no"} review=${task.loopStatus.retryState.reviewRetryAttempted ? "yes" : "no"}`}
+                    </p>
+                    <p>{`Loop next action: ${task.loopStatus.nextAction}`}</p>
                   </>
                 ) : null}
                 {task.stages?.map((stage) => (

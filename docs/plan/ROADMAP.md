@@ -71,6 +71,9 @@ Known post-MVP gaps:
 - while M16-M17 are blocked, local product hardening continues through M18-M21:
   desktop operations, daemon reliability, memory quality, and development-agent
   workflow depth.
+- Hermes comparison identified additional agent-loop reliability work for M22:
+  loop status, retry guards, mutation proof, no-progress guardrails, finalizer
+  diagnostics, and background review cadence.
 
 ## Milestones
 
@@ -912,6 +915,53 @@ Acceptance:
 - failed verification results are summarized without hiding raw failure data.
 - completed development tasks write appropriate memory reflections.
 
+### M22: Agent Loop Reliability and Recovery Visibility
+
+Goal:
+
+- Improve Dore's development-agent loop reliability using concrete gaps found
+  by comparing against `../ref/hermes-agent`.
+
+Status:
+
+- In progress after M21.
+- Comparison source documented in
+  [HERMES_AGENT_LOOP_GAP_ANALYSIS.md](HERMES_AGENT_LOOP_GAP_ANALYSIS.md).
+- First slice implemented: development-agent loop status exposes iteration
+  budget, retry guards, exit reason, and next action through daemon status and
+  the desktop Engineering panel.
+- Second slice implemented: controlled file edits now include mutation proof
+  showing whether the edit landed, target path, status, and non-secret evidence.
+- Third slice implemented: repeated verification failures and blocked
+  file-mutation no-progress loops can be summarized as deterministic guardrail
+  warnings with next actions.
+- Fourth slice implemented: finalizer summaries classify normal completion,
+  budget exhaustion, and guardrail exits.
+- Fifth slice implemented: background review trigger records are generated once
+  deterministic loop activity reaches a configured threshold.
+
+Deliverables:
+
+- per-task loop status with iteration budget, remaining budget, exhaustion flag,
+  retry guards, exit reason, and next action.
+- tool-result proof helper for controlled file mutations.
+- repeated failure and no-progress guardrail summaries.
+- finalizer summary for abnormal stops such as budget exhaustion or guardrail
+  warnings.
+- background review trigger record after deterministic loop activity thresholds.
+
+Acceptance:
+
+- daemon `/status.engineering.tasks[].loop_status` explains active, failed, and
+  exhausted development-agent loops without exposing secrets.
+- desktop Engineering panel renders loop budget, retry guard state, exit reason,
+  and next action.
+- tests cover loop status for planned, failed-verification, and
+  budget-exhausted states.
+- mutation-result classification, repeated-failure guardrails, abnormal-stop
+  finalizers, and background review triggers are covered by tests before any
+  broader autonomous loop behavior is introduced.
+
 ## MVP Completion Rule
 
 Draft-defined MVP is complete. M0-M15 are accepted and the MVP failure criteria
@@ -919,11 +969,12 @@ in `docs/drafts/26_ACCEPTANCE_CRITERIA.md` are false for local, non-real-trading
 operation.
 
 M16-M17 are post-MVP and require user-provided broker/API inputs. They can be
-paused without blocking M19-M21 local hardening.
+paused without blocking M19-M22 local hardening.
 
 ## Next Development Slice
 
-Current next slice: none defined for local hardening after M21.
+Current next slice: continue M22 with tool-result proof and repeated-failure
+guardrail summaries.
 
 M16 remains blocked until user supplies broker/API inputs.
 

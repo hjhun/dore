@@ -137,6 +137,21 @@ export interface DaemonStatusPayload {
         risk_level: string;
         reason: string;
       };
+      loop_status?: {
+        iteration_budget: {
+          max: number;
+          used: number;
+          remaining: number;
+          exhausted: boolean;
+        };
+        retry_state: {
+          failed_verification_retry_attempted: boolean;
+          file_mutation_retry_attempted: boolean;
+          review_retry_attempted: boolean;
+        };
+        exit_reason: string;
+        next_action: string;
+      };
       stages?: Array<{
         kind: string;
         title: string;
@@ -407,6 +422,23 @@ export function mapDaemonStatusToDashboard(
                 approvalRequired: task.risk_review.approval_required,
                 riskLevel: task.risk_review.risk_level,
                 reason: task.risk_review.reason
+              }
+            : undefined,
+          loopStatus: task.loop_status
+            ? {
+                iterationBudget: {
+                  max: task.loop_status.iteration_budget.max,
+                  used: task.loop_status.iteration_budget.used,
+                  remaining: task.loop_status.iteration_budget.remaining,
+                  exhausted: task.loop_status.iteration_budget.exhausted
+                },
+                retryState: {
+                  failedVerificationRetryAttempted: task.loop_status.retry_state.failed_verification_retry_attempted,
+                  fileMutationRetryAttempted: task.loop_status.retry_state.file_mutation_retry_attempted,
+                  reviewRetryAttempted: task.loop_status.retry_state.review_retry_attempted
+                },
+                exitReason: task.loop_status.exit_reason,
+                nextAction: task.loop_status.next_action
               }
             : undefined,
           stages: task.stages?.map((stage) => ({

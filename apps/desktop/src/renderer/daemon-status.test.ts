@@ -139,6 +139,21 @@ describe("daemon status mapping", () => {
               risk_level: "critical",
               reason: "Destructive command requires approval: rm -rf memory"
             },
+            loop_status: {
+              iteration_budget: {
+                max: 7,
+                used: 7,
+                remaining: 0,
+                exhausted: true
+              },
+              retry_state: {
+                failed_verification_retry_attempted: true,
+                file_mutation_retry_attempted: false,
+                review_retry_attempted: true
+              },
+              exit_reason: "iteration_budget_exhausted",
+              next_action: "Stop the loop and summarize progress before continuing."
+            },
             stages: [
               {
                 kind: "plan",
@@ -275,6 +290,21 @@ describe("daemon status mapping", () => {
       approvalRequired: true,
       riskLevel: "critical",
       reason: "Destructive command requires approval: rm -rf memory"
+    });
+    expect(dashboard.engineering.tasks[0].loopStatus).toEqual({
+      iterationBudget: {
+        max: 7,
+        used: 7,
+        remaining: 0,
+        exhausted: true
+      },
+      retryState: {
+        failedVerificationRetryAttempted: true,
+        fileMutationRetryAttempted: false,
+        reviewRetryAttempted: true
+      },
+      exitReason: "iteration_budget_exhausted",
+      nextAction: "Stop the loop and summarize progress before continuing."
     });
     expect(dashboard.approvals[0]).toMatchObject({
       id: "approval_runtime",

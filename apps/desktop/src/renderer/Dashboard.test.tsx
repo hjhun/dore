@@ -33,6 +33,10 @@ describe("Dashboard", () => {
     expect(screen.getByText("approval_demo_001")).toBeTruthy();
     expect(screen.getByText("daemon_status_loaded")).toBeTruthy();
     expect(screen.getByText("intake_demo_001")).toBeTruthy();
+    expect(screen.getByText("Loop: workflow_in_progress")).toBeTruthy();
+    expect(screen.getByText("Loop budget: 2/7 used, 5 remaining")).toBeTruthy();
+    expect(screen.getByText("Loop retry: verification=no file_mutation=no review=no")).toBeTruthy();
+    expect(screen.getByText("Loop next action: Continue the development workflow at the current in-progress stage.")).toBeTruthy();
     expect(screen.getByText("Stage plan: in_progress")).toBeTruthy();
     expect(screen.getByText("Stage patch: pending")).toBeTruthy();
     expect(screen.getByText("Stage verify: pending")).toBeTruthy();

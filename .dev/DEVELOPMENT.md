@@ -398,3 +398,216 @@
 - Runtime state is JSON file-backed and not transactional.
 - M16 broker connector work remains blocked until the user supplies official broker/API documentation, API terms and account constraints, credential references, desired pilot risk limits, and explicit approval policy.
 - M18-M21 local hardening is complete without broker/API inputs; real trading must remain blocked.
+
+## 2026-06-27 M22 Agent Loop Reliability Slice
+
+## Inputs Used
+
+- Prompt: compare Dore against `../ref/hermes-agent` for agent-loop improvements, add roadmap items, and continue development.
+- Requirements: `docs/plan/ROADMAP.md`, `AGENTS.md`, Hermes agent-loop reference files.
+- Plan: add M22 while M16/M17 broker work remains blocked, then implement the first small loop-status slice.
+- Design: deterministic loop status over the existing development workflow, not a new autonomous executor.
+- Dashboard: `.dev/DASHBOARD.md`.
+
+## Implementation Summary
+
+- Added `docs/plan/HERMES_AGENT_LOOP_GAP_ANALYSIS.md`.
+- Added M22 to `docs/plan/ROADMAP.md` and linked it from `docs/plan/README.md`.
+- Added `summarizeDevelopmentAgentLoopStatus` for iteration budget, retry guard, exit reason, and next action summaries.
+- Exposed `loop_status` through daemon engineering task status and execution responses.
+- Mapped loop status into desktop state and rendered it in the Engineering panel.
+- Updated `.dev/DASHBOARD.md` and `.dev/progress/developer.md`.
+
+## Files Changed
+
+- `.dev/DASHBOARD.md`
+- `.dev/DEVELOPMENT.md`
+- `.dev/progress/developer.md`
+- `docs/plan/HERMES_AGENT_LOOP_GAP_ANALYSIS.md`
+- `docs/plan/README.md`
+- `docs/plan/ROADMAP.md`
+- `packages/engineering/src/index.ts`
+- `packages/engineering/src/intake.test.ts`
+- `apps/daemon/src/server.ts`
+- `apps/daemon/src/engineering-route.test.ts`
+- `apps/desktop/src/renderer/Dashboard.tsx`
+- `apps/desktop/src/renderer/Dashboard.test.tsx`
+- `apps/desktop/src/renderer/daemon-status.ts`
+- `apps/desktop/src/renderer/daemon-status.test.ts`
+
+## TDD And Tests
+
+- Red result: targeted tests initially failed because `summarizeDevelopmentAgentLoopStatus` and daemon/desktop `loop_status` mapping did not exist.
+- Green result: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed, 17 files and 168 tests.
+- Broader verification:
+  - `git diff --check`
+  - docs/plan relative link check, 35 links checked
+  - `npx --yes pnpm@11.8.0 test`
+  - `npx --yes pnpm@11.8.0 build`
+  - `npx --yes pnpm@11.8.0 build:desktop`
+  - `npx --yes pnpm@11.8.0 doctor`
+  - changed-file secret-like scan
+
+## Code Quality Notes
+
+- Style: follows existing TypeScript object-mapping style and daemon snake_case response shape.
+- Static analysis: TypeScript build passes.
+- Thread safety: loop status is derived from in-memory task state and persisted event history; no new shared mutable store was introduced.
+- Design patterns: no speculative executor abstraction; M22 starts with observable state before adding guardrails.
+
+## Risks And Blockers
+
+- M22 is not complete; remaining slices are tool-result proof, repeated-failure/no-progress guardrails, abnormal-stop finalizer summary, and background review trigger records.
+- M16/M17 broker connector work remains blocked on official user-provided broker/API inputs.
+
+## 2026-06-27 M22 Tool-result Proof Slice
+
+## Inputs Used
+
+- Prompt: continue Hermes agent-loop comparison work and develop remaining M22 slices.
+- Requirements: `docs/plan/ROADMAP.md` M22 deliverables.
+- Design: use additive proof metadata on existing controlled file edit records.
+- Dashboard: `.dev/DASHBOARD.md`.
+
+## Implementation Summary
+
+- Added `FileMutationProof` and `createFileMutationProof`.
+- Added `mutation_proof` to controlled file edit events.
+- Added `mutation_proof` to daemon `POST /engineering/tasks/:id/apply-edit` responses.
+- Updated M22 dashboard/progress records.
+
+## Files Changed
+
+- `.dev/DASHBOARD.md`
+- `.dev/DEVELOPMENT.md`
+- `.dev/progress/developer.md`
+- `docs/plan/ROADMAP.md`
+- `packages/engineering/src/index.ts`
+- `packages/engineering/src/intake.test.ts`
+- `apps/daemon/src/server.ts`
+- `apps/daemon/src/engineering-route.test.ts`
+
+## TDD And Tests
+
+- Red result: targeted tests failed for missing `createFileMutationProof`, edit event `mutation_proof`, and daemon edit response `mutation_proof`.
+- Green result: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts` passed, 17 files and 169 tests.
+- Broader verification:
+  - `git diff --check`
+  - docs/plan relative link check, 35 links checked
+  - `npx --yes pnpm@11.8.0 test`
+  - `npx --yes pnpm@11.8.0 build`
+  - `npx --yes pnpm@11.8.0 build:desktop`
+  - `npx --yes pnpm@11.8.0 doctor`
+  - changed-file secret-like scan
+
+## Code Quality Notes
+
+- Style: additive event payload and daemon response fields follow existing snake_case daemon contract style.
+- Static analysis: TypeScript build passes.
+- Thread safety: no new shared state was introduced.
+- Design patterns: no new abstraction beyond a small proof helper.
+
+## Risks And Blockers
+
+- Proof is currently attached to successful controlled edits and helper-level blocked records; repeated-failure/no-progress guardrails are still pending.
+- M16/M17 broker connector work remains blocked on official user-provided broker/API inputs.
+
+## 2026-06-27 M22 Guardrail Summary Slice
+
+## Inputs Used
+
+- Prompt: continue Hermes agent-loop comparison work and develop remaining M22 slices.
+- Requirements: `docs/plan/ROADMAP.md` M22 guardrail deliverable.
+- Design: deterministic warning summaries before any hard-stop execution behavior.
+- Dashboard: `.dev/DASHBOARD.md`.
+
+## Implementation Summary
+
+- Added `EngineeringLoopObservation` and `EngineeringLoopGuardrailSummary`.
+- Added `createEngineeringLoopGuardrailSummary` for repeated failed verification and blocked file-mutation no-progress patterns.
+- Updated M22 dashboard/progress records.
+
+## Files Changed
+
+- `.dev/DASHBOARD.md`
+- `.dev/DEVELOPMENT.md`
+- `.dev/progress/developer.md`
+- `docs/plan/ROADMAP.md`
+- `packages/engineering/src/index.ts`
+- `packages/engineering/src/intake.test.ts`
+
+## TDD And Tests
+
+- Red result: targeted engineering test failed for missing `createEngineeringLoopGuardrailSummary`.
+- Green result: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed, 17 files and 170 tests.
+- Broader verification:
+  - `git diff --check`
+  - `npx --yes pnpm@11.8.0 test`
+  - `npx --yes pnpm@11.8.0 build`
+  - `npx --yes pnpm@11.8.0 build:desktop`
+  - `npx --yes pnpm@11.8.0 doctor`
+  - docs/plan relative link check, 35 links checked
+  - changed-file secret-like scan
+
+## Code Quality Notes
+
+- Style: small pure helper with explicit input/output types.
+- Static analysis: TypeScript build passes.
+- Thread safety: no shared state was introduced.
+- Design patterns: warning-only guardrail summary keeps behavior conservative.
+
+## Risks And Blockers
+
+- Guardrail summaries are not yet wired into daemon/desktop status.
+- M22 abnormal-stop finalizer summary and background review trigger records remain pending.
+- M16/M17 broker connector work remains blocked on official user-provided broker/API inputs.
+
+## 2026-06-27 M22 Finalizer And Background Review Slice
+
+## Inputs Used
+
+- Prompt: complete remaining Hermes agent-loop comparison slices in M22.
+- Requirements: `docs/plan/ROADMAP.md` M22 finalizer and background review deliverables.
+- Design: deterministic summaries and append-only trigger records.
+- Dashboard: `.dev/DASHBOARD.md`.
+
+## Implementation Summary
+
+- Added `EngineeringLoopFinalizerSummary` and `createEngineeringLoopFinalizerSummary`.
+- Added `EngineeringBackgroundReviewTrigger` and `createEngineeringBackgroundReviewTrigger`.
+- Added `appendEngineeringBackgroundReviewTriggerEvent`.
+- Updated M22 roadmap, dashboard, and progress records.
+
+## Files Changed
+
+- `.dev/DASHBOARD.md`
+- `.dev/DEVELOPMENT.md`
+- `.dev/progress/developer.md`
+- `docs/plan/ROADMAP.md`
+- `packages/engineering/src/index.ts`
+- `packages/engineering/src/intake.test.ts`
+
+## TDD And Tests
+
+- Red result: targeted engineering test failed for missing finalizer/background review helpers and event writer.
+- Green result: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed, 17 files and 172 tests.
+- Broader verification:
+  - `git diff --check`
+  - `npx --yes pnpm@11.8.0 test`
+  - `npx --yes pnpm@11.8.0 build`
+  - `npx --yes pnpm@11.8.0 build:desktop`
+  - `npx --yes pnpm@11.8.0 doctor`
+  - docs/plan relative link check, 35 links checked
+  - changed-file secret-like scan
+
+## Code Quality Notes
+
+- Style: pure helpers plus append-only event writer matching existing engineering event patterns.
+- Static analysis: TypeScript build passes.
+- Thread safety: no shared mutable state was introduced.
+- Design patterns: trigger records are audit metadata, not a background execution framework.
+
+## Risks And Blockers
+
+- Background review execution remains a later runtime concern; M22 records the deterministic trigger.
+- M16/M17 broker connector work remains blocked on official user-provided broker/API inputs.

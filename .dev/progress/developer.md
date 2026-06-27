@@ -321,3 +321,40 @@
 ## Blockers
 
 - M16/M17 broker connector and pilot real trading work are blocked on user-provided official broker/API inputs.
+
+## 2026-06-27 M22 Agent Loop Reliability
+
+- State: in_progress
+- Inputs reviewed: `.dev/DASHBOARD.md`, `docs/plan/ROADMAP.md`, `../ref/hermes-agent/agent/conversation_loop.py`, `../ref/hermes-agent/agent/iteration_budget.py`, `../ref/hermes-agent/agent/turn_retry_state.py`, `../ref/hermes-agent/agent/turn_finalizer.py`, `../ref/hermes-agent/agent/tool_result_classification.py`, `../ref/hermes-agent/agent/tool_guardrails.py`, and `../ref/hermes-agent/website/docs/developer-guide/agent-loop.md`.
+- Current work: documented Hermes agent-loop gaps and implemented the first M22 slice for development-agent loop status.
+- Targeted verification: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts apps/desktop/src/renderer/daemon-status.test.ts apps/desktop/src/renderer/Dashboard.test.tsx` passed, 17 files and 168 tests.
+- Full verification: `npx --yes pnpm@11.8.0 test`, `npx --yes pnpm@11.8.0 build`, `npx --yes pnpm@11.8.0 build:desktop`, `npx --yes pnpm@11.8.0 doctor`, `git diff --check`, docs/plan relative link check, and changed-file secret-like scan passed.
+- Decision: model loop status as a deterministic summary over the existing development workflow instead of introducing a new autonomous executor.
+- Remaining M22 work: tool-result proof, repeated-failure/no-progress guardrails, abnormal-stop finalizer summary, and background review trigger records.
+
+## 2026-06-27 M22 Tool-result Proof
+
+- State: in_progress
+- Current work: implemented controlled file mutation proof based on the Hermes `tool_result_classification.py` gap.
+- Red phase: targeted tests failed for missing `createFileMutationProof`, missing edit event `mutation_proof`, and missing daemon edit route proof response.
+- Green phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts apps/daemon/src/engineering-route.test.ts` passed, 17 files and 169 tests.
+- Decision: keep proof additive in the existing edit event and route response instead of changing file-edit execution semantics.
+- Remaining M22 work: repeated-failure/no-progress guardrails, abnormal-stop finalizer summary, and background review trigger records.
+
+## 2026-06-27 M22 Guardrail Summaries
+
+- State: in_progress
+- Current work: implemented repeated verification failure and blocked file-mutation no-progress guardrail summaries.
+- Red phase: targeted engineering test failed for missing `createEngineeringLoopGuardrailSummary`.
+- Green phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed, 17 files and 170 tests.
+- Decision: start with deterministic warnings and next actions before adding any hard-stop behavior.
+- Remaining M22 work: abnormal-stop finalizer summary and background review trigger records.
+
+## 2026-06-27 M22 Finalizer And Background Review
+
+- State: complete
+- Current work: implemented abnormal-stop finalizer summaries and deterministic background review trigger records.
+- Red phase: targeted engineering test failed for missing `createEngineeringLoopFinalizerSummary`, `createEngineeringBackgroundReviewTrigger`, and `appendEngineeringBackgroundReviewTriggerEvent`.
+- Green phase: `npx --yes pnpm@11.8.0 test -- packages/engineering/src/intake.test.ts` passed, 17 files and 172 tests.
+- Decision: keep background review as an auditable trigger record; actual background worker execution can remain a later runtime concern.
+- Remaining M22 work: none in the current roadmap checklist.
